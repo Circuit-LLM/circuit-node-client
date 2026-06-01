@@ -758,11 +758,11 @@ async function loadIdentity() {
   txt('ov-region', data.region ?? '—');
   txt('ov-port', data.apiPort ?? PORT);
 
-  // Shards
+  // Shards — own node data comes from localhost /node but escape defensively
   const shardEl = $('ov-shards');
   if (shardEl) {
     shardEl.innerHTML = (data.shards ?? ['all']).map(s =>
-      `<span class="shard-pill">${s}</span>`
+      `<span class="shard-pill">${_esc(s)}</span>`
     ).join('');
   }
 
@@ -855,7 +855,7 @@ function renderNetwork() {
     const vers = stats.versions ?? {};
     const vkeys = Object.keys(vers);
     verEl.innerHTML = vkeys.length ? vkeys.sort().map(v =>
-      `<div class="kv"><span class="kv-k">v${v}</span><span class="kv-v">${vers[v]} node${vers[v] !== 1 ? 's' : ''}</span></div>`
+      `<div class="kv"><span class="kv-k">v${_esc(v)}</span><span class="kv-v">${_esc(String(vers[v]))} node${vers[v] !== 1 ? 's' : ''}</span></div>`
     ).join('') : '<div class="kv"><span class="kv-k" style="color:var(--dim)">No version data</span></div>';
   }
 
@@ -866,26 +866,29 @@ function renderNetwork() {
     peerEl.innerHTML = '<div class="empty"><div class="empty-icon">◌</div><p>No nodes registered yet. Be the first.</p></div>';
     return;
   }
+  // Peer data comes from the network registry — treat every field as untrusted.
+  // statusCls uses a whitelist map so a malicious status value can never inject into class="".
+  const STATUS_CLS = { online: 'b-green', syncing: 'b-amber' };
   peerEl.innerHTML = nodes.map(n => {
-    const statusCls = n.status === 'online' ? 'b-green' : n.status === 'syncing' ? 'b-amber' : 'b-dim';
-    const shards    = (n.shards ?? ['all']).map(s => `<span class="shard-pill">${s}</span>`).join('');
+    const statusCls = STATUS_CLS[n.status] ?? 'b-dim';
+    const shards    = (n.shards ?? ['all']).map(s => `<span class="shard-pill">${_esc(s)}</span>`).join('');
     return `
       <div class="peer-card">
-        <div class="peer-id">${n.nodeId.slice(0,20)}…</div>
+        <div class="peer-id">${_esc((n.nodeId ?? '').slice(0,20))}…</div>
         <div class="kv" style="border-bottom:none;padding:2px 0">
           <span class="kv-k">Version</span>
-          <span class="kv-v">v${n.version ?? '?'}</span>
+          <span class="kv-v">v${_esc(n.version ?? '?')}</span>
         </div>
         <div class="kv" style="border-bottom:none;padding:2px 0">
           <span class="kv-k">Region</span>
-          <span class="kv-v">${n.region ?? 'unknown'}</span>
+          <span class="kv-v">${_esc(n.region ?? 'unknown')}</span>
         </div>
         <div class="kv" style="border-bottom:none;padding:2px 0">
           <span class="kv-k">Uptime</span>
-          <span class="kv-v">${fmtUptime(n.uptime)}</span>
+          <span class="kv-v">${_esc(fmtUptime(n.uptime))}</span>
         </div>
         <div class="peer-meta">
-          <span class="badge ${statusCls}">${n.status.toUpperCase()}</span>
+          <span class="badge ${statusCls}">${_esc((n.status ?? 'unknown').toUpperCase())}</span>
           ${n.agentRunning ? '<span class="badge b-teal">AGENT</span>' : ''}
         </div>
         <div class="shard-list" style="margin-top:6px">${shards}</div>
