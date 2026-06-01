@@ -1,0 +1,25 @@
+# systemd user service for circuit-node-client
+# Install: cp circuit-node-client.service ~/.config/systemd/user/
+#          systemctl --user daemon-reload
+#          systemctl --user enable --now circuit-node-client
+
+[Unit]
+Description=CIRCUIT Node Client — Distributed RPC Network Node
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/circuit-node-client
+ExecStart=/usr/bin/node node-client.js start
+Restart=always
+RestartSec=15
+
+# Environment
+Environment=NODE_ENV=production
+
+# Logging (journalctl --user -u circuit-node-client -f)
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

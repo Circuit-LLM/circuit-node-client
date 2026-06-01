@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<title>CIRCUIT NODE — Client Dashboard</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09080a;--s1:#110f07;--s2:#161408;--s3:#1c190a;
+  --border:#3a2e00;--border2:#503e00;
+  --text:#d8cc90;--muted:#7a6e30;--dim:#2e2800;--bright:#ffe880;
+  --yellow:#ffe000;--gold:#c9a800;--amber:#ff9500;--red:#cc3333;--green:#7acc60;
+  --font:'Courier New',Courier,monospace;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:12px;display:flex;flex-direction:column}
+
+/* Header */
+.hdr{background:var(--s1);border-bottom:1px solid var(--border2);padding:0 20px;display:flex;align-items:stretch;height:48px;flex-shrink:0;position:relative}
+.hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,224,0,.2),transparent);pointer-events:none}
+.hdr-logo{display:flex;flex-direction:column;justify-content:center;padding-right:20px;border-right:1px solid var(--border2)}
+.hdr-logo-title{font-size:13px;font-weight:700;letter-spacing:.18em;color:var(--yellow);text-shadow:0 0 10px rgba(255,224,0,.6),0 0 24px rgba(255,224,0,.25)}
+.hdr-logo-sub{font-size:8px;letter-spacing:.22em;color:var(--muted);margin-top:2px;text-transform:uppercase}
+.hdr-stats{display:flex;align-items:stretch;flex:1}
+.hstat{display:flex;flex-direction:column;justify-content:center;padding:0 18px;border-right:1px solid var(--border);cursor:default;transition:background .15s}
+.hstat:hover{background:var(--s2)}
+.hstat-l{font-size:8px;letter-spacing:.14em;color:var(--muted);margin-bottom:3px;text-transform:uppercase}
+.hstat-v{font-size:13px;font-weight:700;color:var(--bright)}
+.hstat-v.green{color:var(--yellow);text-shadow:0 0 6px rgba(255,224,0,.3)}
+.hstat-v.amber{color:var(--amber)}
+.hstat-v.red{color:var(--red)}
+.hdr-right{display:flex;align-items:center;gap:12px;padding-left:16px;border-left:1px solid var(--border2)}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--yellow);box-shadow:0 0 8px var(--yellow);animation:pulse 2s ease-in-out infinite}
+.live-dot.amber{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.live-dot.red{background:var(--red);box-shadow:0 0 8px var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.hdr-node-id{font-size:9px;color:var(--muted);letter-spacing:.06em;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Tabs */
+.tabs{background:var(--s1);border-bottom:1px solid var(--border2);display:flex;padding:0 20px;flex-shrink:0;overflow-x:auto}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:0 18px;height:36px;display:flex;align-items:center;cursor:pointer;font-size:10px;letter-spacing:.16em;color:var(--muted);border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;gap:6px;text-transform:uppercase}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--yellow);border-bottom-color:var(--yellow)}
+.dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.6}
+.tab.active .dot{opacity:1}
+
+/* Main */
+.main{flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-track{background:var(--s1)}
+.main::-webkit-scrollbar-thumb{background:var(--border2)}
+.panel{display:none;padding:14px 18px;min-height:100%;flex:1}
+.panel.active{display:block}
+
+/* Cards */
+.card{background:var(--s1);border:1px solid var(--border);padding:14px 16px;margin-bottom:10px;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;width:8px;height:8px;border-top:1px solid var(--gold);border-left:1px solid var(--gold);opacity:.7;pointer-events:none;z-index:5}
+.card::after{content:'';position:absolute;bottom:0;right:0;width:8px;height:8px;border-bottom:1px solid var(--gold);border-right:1px solid var(--gold);opacity:.4;pointer-events:none;z-index:5}
+.card-t{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:-14px -16px 12px;padding:8px 14px;position:relative;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(90deg,var(--s2),var(--s1));border-bottom:1px solid var(--border)}
+.card-t::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,224,0,.12),transparent);pointer-events:none}
+.card-t-r{font-size:9px;color:var(--dim);letter-spacing:.06em}
+
+/* Grid */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.mb{margin-bottom:10px}
+
+/* Chips */
+.chips{display:grid;gap:8px}
+.chips-4{grid-template-columns:repeat(4,1fr)}
+.chips-3{grid-template-columns:repeat(3,1fr)}
+.chip{background:var(--s2);border:1px solid var(--border2);padding:12px 13px;position:relative}
+.chip-l{font-size:8px;letter-spacing:.14em;color:var(--muted);margin-bottom:7px;text-transform:uppercase}
+.chip-v{font-size:22px;font-weight:700;color:var(--bright);line-height:1}
+.chip-v.green{color:var(--yellow)}
+.chip-s{font-size:9px;color:var(--muted);margin-top:4px}
+
+/* KV rows */
+.kv{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--dim);font-size:11px}
+.kv:last-child{border-bottom:none}
+.kv-k{color:var(--muted)}
+.kv-v{color:var(--text);font-weight:500}
+.kv-v.green{color:var(--yellow)}
+.kv-v.amber{color:var(--amber)}
+.kv-v.red{color:var(--red)}
+
+/* Tables */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{text-align:left;padding:6px 8px;font-size:8px;letter-spacing:.14em;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;text-transform:uppercase}
+td{padding:6px 8px;border-bottom:1px solid var(--dim);vertical-align:middle}
+tr:hover td{background:var(--s2)}
+tr:last-child td{border-bottom:none}
+
+/* Badges */
+.badge{display:inline-block;padding:2px 7px;font-size:9px;letter-spacing:.06em;border:1px solid;font-weight:700}
+.b-green{background:rgba(255,224,0,.06);color:var(--yellow);border-color:rgba(255,224,0,.2)}
+.b-teal{background:rgba(201,168,0,.06);color:var(--gold);border-color:rgba(201,168,0,.2)}
+.b-amber{background:rgba(255,149,0,.06);color:var(--amber);border-color:rgba(255,149,0,.2)}
+.b-red{background:rgba(204,51,51,.08);color:var(--red);border-color:rgba(204,51,51,.25)}
+.b-dim{background:var(--dim);color:var(--muted);border-color:var(--border)}
+
+/* Key box */
+.key-box{background:var(--s3);border:1px solid var(--border2);padding:14px 16px;font-size:11px;word-break:break-all;line-height:1.7;color:var(--bright);position:relative;cursor:pointer;transition:border-color .15s}
+.key-box:hover{border-color:var(--yellow)}
+.key-box-label{font-size:8px;letter-spacing:.16em;color:var(--muted);margin-bottom:8px;text-transform:uppercase;display:flex;justify-content:space-between}
+.copy-hint{color:var(--dim);font-size:8px}
+.key-box:hover .copy-hint{color:var(--yellow)}
+.key-copied{position:absolute;top:8px;right:10px;font-size:9px;color:var(--yellow);opacity:0;transition:opacity .3s}
+.key-copied.show{opacity:1}
+
+/* Status ring */
+.status-ring{display:flex;align-items:center;gap:8px}
+.ring{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.ring.online{background:var(--yellow);box-shadow:0 0 6px var(--yellow)}
+.ring.syncing{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+.ring.offline{background:var(--red);box-shadow:0 0 6px var(--red)}
+
+/* Network map */
+.peer-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.peer-card{background:var(--s2);border:1px solid var(--border);padding:10px 12px;transition:border-color .15s}
+.peer-card:hover{border-color:var(--border2)}
+.peer-id{font-size:10px;color:var(--bright);font-weight:700;margin-bottom:6px;letter-spacing:.04em}
+.peer-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+
+/* Log */
+.log-box{background:var(--s3);border:1px solid var(--border);padding:10px 12px;font-size:10px;line-height:1.8;max-height:220px;overflow-y:auto;color:var(--muted)}
+.log-box::-webkit-scrollbar{width:3px}
+.log-box::-webkit-scrollbar-thumb{background:var(--border2)}
+.log-line{border-bottom:1px solid var(--dim);padding:2px 0}
+.log-line:last-child{border-bottom:none}
+.log-line .ts{color:var(--dim);margin-right:8px}
+.log-line .msg{color:var(--text)}
+.log-line.ok .msg{color:var(--yellow)}
+.log-line.warn .msg{color:var(--amber)}
+.log-line.err .msg{color:var(--red)}
+
+/* Update banner */
+.update-banner{background:rgba(255,149,0,.04);border:1px solid rgba(255,149,0,.2);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.update-banner h3{font-size:11px;color:var(--amber);letter-spacing:.08em}
+.update-banner p{font-size:10px;color:var(--muted);margin-top:3px}
+.btn{background:none;border:1px solid var(--border2);color:var(--muted);padding:5px 14px;cursor:pointer;font-family:var(--font);font-size:9px;letter-spacing:.1em;text-transform:uppercase;transition:all .15s}
+.btn:hover{border-color:var(--yellow);color:var(--yellow)}
+.btn.primary{border-color:var(--gold);color:var(--gold)}
+.btn.primary:hover{background:rgba(255,224,0,.06);border-color:var(--yellow);color:var(--yellow)}
+.btn.amber{border-color:var(--amber);color:var(--amber)}
+.btn.amber:hover{background:rgba(255,149,0,.06)}
+
+/* Shard pills */
+.shard-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.shard-pill{padding:2px 8px;font-size:8px;letter-spacing:.08em;border:1px solid var(--border2);color:var(--gold);background:rgba(201,168,0,.04)}
+
+/* Empty */
+.empty{text-align:center;padding:40px 20px;color:var(--dim)}
+.empty-icon{font-size:28px;margin-bottom:10px;opacity:.4}
+.empty p{font-size:11px;letter-spacing:.06em}
+
+/* Section label */
+.sec-label{font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--dim)}
+
+/* Chat */
+#panel-chat.active{display:flex!important;flex-direction:column;height:100%}
+.chat-wrap{display:flex;flex-direction:column;flex:1;min-height:400px}
+.chat-messages{flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+.chat-messages::-webkit-scrollbar{width:4px}
+.chat-messages::-webkit-scrollbar-thumb{background:var(--border2)}
+.chat-msg{max-width:78%;padding:9px 13px;font-size:11px;line-height:1.7;border:1px solid}
+.chat-msg.user{align-self:flex-end;background:rgba(255,224,0,.03);border-color:rgba(255,224,0,.15);color:var(--bright)}
+.chat-msg.assistant{align-self:flex-start;background:var(--s2);border-color:var(--border);color:var(--text)}
+.chat-msg.system{align-self:center;background:var(--dim);border-color:var(--border);color:var(--muted);font-size:9px;letter-spacing:.08em;max-width:95%;text-align:center}
+.chat-msg.error{align-self:flex-start;background:rgba(204,51,51,.04);border-color:rgba(204,51,51,.25);color:var(--red)}
+.chat-cursor{display:inline-block;width:6px;height:11px;background:var(--yellow);margin-left:2px;animation:blink .7s step-end infinite;vertical-align:text-bottom}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.chat-bar{background:var(--s1);border-top:1px solid var(--border2);padding:10px 14px;display:flex;gap:8px;flex-shrink:0}
+.chat-input{flex:1;background:var(--s3);border:1px solid var(--border2);color:var(--bright);padding:8px 12px;font-family:var(--font);font-size:11px;outline:none;resize:none;height:38px;line-height:1.5}
+.chat-input:focus{border-color:var(--yellow)}
+.chat-input::placeholder{color:var(--muted)}
+.chat-send{background:none;border:1px solid var(--border2);color:var(--muted);padding:0 16px;cursor:pointer;font-family:var(--font);font-size:9px;letter-spacing:.1em;text-transform:uppercase;transition:all .15s;height:38px}
+.chat-send:hover{border-color:var(--yellow);color:var(--yellow)}
+.chat-send:disabled{opacity:.35;cursor:default}
+.chat-status-bar{font-size:9px;color:var(--muted);padding:4px 18px;background:var(--s1);border-top:1px solid var(--dim);letter-spacing:.06em;flex-shrink:0}
+.chat-conn-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--red);margin-right:5px;vertical-align:middle}
+.chat-conn-dot.connected{background:var(--yellow)}
+
+/* Staking access card */
+.stake-access-bar{display:flex;align-items:center;justify-content:space-between;background:var(--s3);border:1px solid var(--border);padding:12px 14px;margin-bottom:14px}
+.stake-access-status{font-size:13px;font-weight:700;letter-spacing:.08em}
+.stake-access-status.unlocked{color:var(--yellow);text-shadow:0 0 10px rgba(255,224,0,.35)}
+.stake-access-status.locked{color:var(--red)}
+.stake-access-status.checking{color:var(--muted)}
+.stake-wallet-tag{font-size:9px;color:var(--muted);letter-spacing:.06em;background:var(--s2);border:1px solid var(--border);padding:3px 8px;cursor:pointer;transition:border-color .15s}
+.stake-wallet-tag:hover{border-color:var(--border2);color:var(--text)}
+.stake-progress{height:3px;background:var(--dim);margin-bottom:14px;overflow:hidden}
+.stake-progress-fill{height:100%;background:var(--yellow);transition:width .4s;box-shadow:0 0 6px rgba(255,224,0,.4)}
+
+/* Responsive */
+@media(max-width:600px){
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .chips-4,.chips-3{grid-template-columns:1fr 1fr}
+  .hdr-stats .hstat:nth-child(n+4){display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="hdr">
+  <div class="hdr-logo">
+    <div class="hdr-logo-title">CIRCUIT NODE</div>
+    <div class="hdr-logo-sub">DISTRIBUTED NETWORK CLIENT</div>
+  </div>
+  <div class="hdr-stats">
+    <div class="hstat">
+      <div class="hstat-l">STATUS</div>
+      <div class="hstat-v green" id="h-status">ONLINE</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-l">VERSION</div>
+      <div class="hstat-v" id="h-version">—</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-l">UPTIME</div>
+      <div class="hstat-v" id="h-uptime">—</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-l">NETWORK PEERS</div>
+      <div class="hstat-v green" id="h-peers">—</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-l">SYNC</div>
+      <div class="hstat-v" id="h-sync">—</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-l">AGENT</div>
+      <div class="hstat-v" id="h-agent">—</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="live-dot" id="live-dot"></div>
+    <div class="hdr-node-id" id="hdr-node-id">loading…</div>
+  </div>
+</header>
+
+<!-- ── Tabs ── -->
+<nav class="tabs">
+  <div class="tab active" onclick="showTab('overview')"><span class="dot"></span>OVERVIEW</div>
+  <div class="tab" onclick="showTab('rpc')"><span class="dot"></span>RPC KEY</div>
+  <div class="tab" onclick="showTab('network')"><span class="dot"></span>NETWORK</div>
+  <div class="tab" onclick="showTab('updates')"><span class="dot"></span>UPDATES</div>
+  <div class="tab" onclick="showTab('agent')"><span class="dot"></span>AGENT</div>
+  <div class="tab" onclick="showTab('chat')" id="tab-chat"><span class="dot"></span>CHAT</div>
+</nav>
+
+<!-- ── Main ── -->
+<main class="main">
+
+  <!-- ── OVERVIEW ── -->
+  <section class="panel active" id="panel-overview">
+    <div class="g2 mb">
+
+      <div class="card">
+        <div class="card-t">Node Identity</div>
+        <div class="kv"><span class="kv-k">Node ID</span><span class="kv-v" id="ov-nodeid" style="font-size:9px">—</span></div>
+        <div class="kv"><span class="kv-k">Version</span><span class="kv-v" id="ov-version">—</span></div>
+        <div class="kv"><span class="kv-k">Region</span><span class="kv-v" id="ov-region">—</span></div>
+        <div class="kv"><span class="kv-k">API Port</span><span class="kv-v" id="ov-port">—</span></div>
+        <div class="kv"><span class="kv-k">Network Status</span>
+          <span class="kv-v">
+            <span class="status-ring"><span class="ring" id="ov-ring"></span><span id="ov-status-text">—</span></span>
+          </span>
+        </div>
+        <div class="kv"><span class="kv-k">Uptime</span><span class="kv-v green" id="ov-uptime">—</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-t">Sync Status</div>
+        <div class="kv"><span class="kv-k">Protocol</span><span class="kv-v" id="ov-sync-protocol">—</span></div>
+        <div class="kv"><span class="kv-k">Status</span><span class="kv-v" id="ov-sync-status">—</span></div>
+        <div class="kv"><span class="kv-k">Lag</span><span class="kv-v" id="ov-sync-lag">—</span></div>
+        <div class="kv"><span class="kv-k">Last Sync</span><span class="kv-v" id="ov-sync-last">—</span></div>
+        <div class="kv"><span class="kv-k">Slot Height</span><span class="kv-v" id="ov-sync-slot">—</span></div>
+        <div class="sec-label" style="margin-top:12px">Shard Assignment</div>
+        <div class="shard-list" id="ov-shards"></div>
+      </div>
+    </div>
+
+    <div class="card mb">
+      <div class="card-t">Network At a Glance <span class="card-t-r" id="ov-map-ts">—</span></div>
+      <div class="chips chips-4" id="ov-chips">
+        <div class="chip"><div class="chip-l">Online Nodes</div><div class="chip-v green" id="ov-online">—</div></div>
+        <div class="chip"><div class="chip-l">Nodes w/ Agent</div><div class="chip-v" id="ov-agents">—</div></div>
+        <div class="chip"><div class="chip-l">Your Rank</div><div class="chip-v" id="ov-rank">—</div></div>
+        <div class="chip"><div class="chip-l">Network Version</div><div class="chip-v" id="ov-netver">—</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-t">Activity Log <span class="card-t-r">last 10 events</span></div>
+      <div class="log-box" id="ov-log">
+        <div class="log-line ok"><span class="ts">—</span><span class="msg">Node started</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── RPC KEY ── -->
+  <section class="panel" id="panel-rpc">
+    <div class="card mb">
+      <div class="card-t">Your RPC API Key</div>
+      <p style="font-size:11px;color:var(--muted);line-height:1.8;margin-bottom:14px">
+        This key grants access to your node's local API. Share it with applications
+        running on this machine, or with trusted users you want to give free access
+        to this node's data endpoints.
+      </p>
+      <div class="key-box-label"><span>RPC KEY</span><span class="copy-hint">click to copy</span></div>
+      <div class="key-box" id="rpc-key-box" onclick="copyKey('rpc-key-val','rpc-copied')">
+        <span id="rpc-key-val">generating…</span>
+        <span class="key-copied" id="rpc-copied">copied ✓</span>
+      </div>
+    </div>
+
+    <div class="card mb">
+      <div class="card-t">Node Identity Key (Public)</div>
+      <p style="font-size:11px;color:var(--muted);line-height:1.8;margin-bottom:14px">
+        Your ed25519 public key. This IS your node ID on the CIRCUIT network.
+        It is used to sign all your registry communications. Safe to share publicly.
+      </p>
+      <div class="key-box-label"><span>NODE ID (PUBLIC KEY)</span><span class="copy-hint">click to copy</span></div>
+      <div class="key-box" id="nodeid-box" onclick="copyKey('nodeid-val','nodeid-copied')">
+        <span id="nodeid-val">loading…</span>
+        <span class="key-copied" id="nodeid-copied">copied ✓</span>
+      </div>
+    </div>
+
+    <div class="g2 mb">
+      <div class="card">
+        <div class="card-t">Local API Usage</div>
+        <div class="kv"><span class="kv-k">Base URL</span><span class="kv-v" id="rpc-base-url">—</span></div>
+        <div class="kv"><span class="kv-k">Auth Header</span><span class="kv-v">X-Api-Key: &lt;key&gt;</span></div>
+        <div class="kv"><span class="kv-k">Local access</span><span class="kv-v green">Free (no key needed)</span></div>
+        <div class="kv"><span class="kv-k">External access</span><span class="kv-v">Key required</span></div>
+        <div class="kv"><span class="kv-k">Endpoints</span><span class="kv-v">All circuit-node API routes</span></div>
+      </div>
+      <div class="card">
+        <div class="card-t">Example Request</div>
+        <div style="background:var(--s3);border:1px solid var(--border);padding:10px 12px;font-size:10px;line-height:1.9;color:var(--text)">
+          <div style="color:var(--muted)">// Token price</div>
+          <div>GET <span id="ex-url-1" style="color:var(--green)">http://localhost:19000</span></div>
+          <div style="padding-left:12px">/api/token/&lt;mint&gt;</div>
+          <br>
+          <div style="color:var(--muted)">// Wallet rank</div>
+          <div>GET <span style="color:var(--green)">http://localhost:19000</span></div>
+          <div style="padding-left:12px">/api/wallet/&lt;address&gt;/rank</div>
+          <br>
+          <div style="color:var(--muted)">// No key needed from localhost</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CIRC Staking Access ── -->
+    <div class="card" id="stake-card">
+      <div class="card-t">CIRC Staking Access <span class="card-t-r" id="stake-ts">—</span></div>
+
+      <!-- Pool not configured in config/client.json -->
+      <div id="stake-not-configured" style="display:none">
+        <p style="font-size:11px;color:var(--muted);line-height:1.8">
+          Staking gate not configured. Add to <code style="color:var(--green)">config/client.json</code>:
+        </p>
+        <div style="background:var(--s3);border:1px solid var(--border);padding:10px 12px;font-size:10px;line-height:1.9;color:var(--text);margin-top:10px">
+          <div style="color:var(--muted)">// access section</div>
+          <div style="color:var(--green)">"stakingPool":   "&lt;pool-address&gt;",</div>
+          <div style="color:var(--green)">"stakingPoolId": "&lt;stakepoint-pool-id&gt;",</div>
+          <div style="color:var(--green)">"minStakeCirc":  100000</div>
+        </div>
+      </div>
+
+      <!-- Wallet not connected -->
+      <div id="stake-connect-prompt">
+        <p style="font-size:11px;color:var(--muted);line-height:1.8;margin-bottom:12px">
+          Stake CIRC tokens to unlock RPC access for external callers.
+          Connect your wallet to verify your on-chain stake position.
+        </p>
+        <div class="kv"><span class="kv-k">Min. Required</span><span class="kv-v amber" id="stake-min-display">—</span></div>
+        <div class="kv"><span class="kv-k">Staking Pool</span>
+          <span class="kv-v"><a id="stake-pool-link" href="https://stakepoint.app" target="_blank"
+            style="color:var(--gold);text-decoration:none">stakepoint.app ↗</a></span>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn primary" onclick="connectStakeWallet()">◎ CONNECT WALLET</button>
+          <a id="stake-go-link" href="https://stakepoint.app" target="_blank" class="btn">STAKE CIRC ↗</a>
+        </div>
+      </div>
+
+      <!-- Wallet connected — showing stake status -->
+      <div id="stake-status-panel" style="display:none">
+        <div class="stake-access-bar">
+          <div>
+            <div style="font-size:8px;letter-spacing:.16em;color:var(--muted);margin-bottom:5px;text-transform:uppercase">Access Status</div>
+            <div class="stake-access-status checking" id="stake-access-label">CHECKING…</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:8px;letter-spacing:.12em;color:var(--muted);margin-bottom:5px;text-transform:uppercase">Wallet</div>
+            <div class="stake-wallet-tag" onclick="disconnectStakeWallet()" title="Click to disconnect">
+              <span id="stake-wallet-short">—</span> ✕
+            </div>
+          </div>
+        </div>
+        <div class="stake-progress mb">
+          <div class="stake-progress-fill" id="stake-progress-fill" style="width:0%"></div>
+        </div>
+        <div class="kv"><span class="kv-k">Staked CIRC</span><span class="kv-v" id="stake-amount-display">—</span></div>
+        <div class="kv"><span class="kv-k">Required</span><span class="kv-v" id="stake-req-display">—</span></div>
+        <div class="kv"><span class="kv-k">Lock Until</span><span class="kv-v" id="stake-lock-display">—</span></div>
+        <div class="kv"><span class="kv-k">Position</span><span class="kv-v" id="stake-position-display" style="font-size:9px">—</span></div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <a id="stake-action-link" href="https://stakepoint.app" target="_blank" class="btn primary">MANAGE STAKE ↗</a>
+          <button class="btn" onclick="refreshStake()">REFRESH</button>
+          <button class="btn" onclick="disconnectStakeWallet()" style="margin-left:auto">DISCONNECT</button>
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div id="stake-loading" style="display:none;padding:10px 0;font-size:11px;color:var(--muted);letter-spacing:.06em">
+        ◌ Checking on-chain stake…
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ── NETWORK ── -->
+  <section class="panel" id="panel-network">
+
+    <div class="card mb" id="net-hub-card">
+      <div class="card-t">Canonical Hub <span class="card-t-r" id="net-hub-url">—</span></div>
+      <div class="g2">
+        <div>
+          <div class="kv"><span class="kv-k">Status</span>
+            <span class="kv-v"><span class="status-ring"><span class="ring" id="net-hub-ring"></span><span id="net-hub-status">—</span></span></span>
+          </div>
+          <div class="kv"><span class="kv-k">Version</span><span class="kv-v" id="net-hub-version">—</span></div>
+          <div class="kv"><span class="kv-k">Service</span><span class="kv-v" id="net-hub-service">—</span></div>
+        </div>
+        <div>
+          <div class="kv"><span class="kv-k">Role</span><span class="kv-v green">Canonical Registry</span></div>
+          <div class="kv"><span class="kv-k">RPC</span><span class="kv-v" id="net-hub-rpc">—</span></div>
+          <div class="kv"><span class="kv-k">Your connection</span><span class="kv-v green">Proxied via this node</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chips chips-4 mb">
+      <div class="chip"><div class="chip-l">Total Nodes</div><div class="chip-v" id="net-total">—</div></div>
+      <div class="chip"><div class="chip-l">Online</div><div class="chip-v green" id="net-online">—</div></div>
+      <div class="chip"><div class="chip-l">Offline</div><div class="chip-v" id="net-offline">—</div></div>
+      <div class="chip"><div class="chip-l">Running Agent</div><div class="chip-v teal" id="net-agents" style="color:var(--teal)">—</div></div>
+    </div>
+
+    <div class="g2 mb">
+      <div class="card">
+        <div class="card-t">Shard Coverage</div>
+        <div id="net-shards"><div class="kv"><span class="kv-k">loading…</span><span class="kv-v">—</span></div></div>
+      </div>
+      <div class="card">
+        <div class="card-t">Version Distribution</div>
+        <div id="net-versions"><div class="kv"><span class="kv-k">loading…</span><span class="kv-v">—</span></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-t">Live Nodes <span class="card-t-r" id="net-ts">—</span></div>
+      <div class="peer-grid" id="net-peers">
+        <div class="empty"><div class="empty-icon">◌</div><p>Fetching network peers…</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── UPDATES ── -->
+  <section class="panel" id="panel-updates">
+    <div id="update-banner-wrap"></div>
+
+    <div class="g2 mb">
+      <div class="card">
+        <div class="card-t">Current Installation</div>
+        <div class="kv"><span class="kv-k">Version</span><span class="kv-v green" id="upd-current">—</span></div>
+        <div class="kv"><span class="kv-k">Auto-update</span><span class="kv-v" id="upd-auto">—</span></div>
+        <div class="kv"><span class="kv-k">Auto-apply</span><span class="kv-v" id="upd-autoapply">—</span></div>
+        <div class="kv"><span class="kv-k">Check interval</span><span class="kv-v" id="upd-interval">—</span></div>
+        <div class="kv"><span class="kv-k">Source</span><span class="kv-v" id="upd-source">—</span></div>
+        <div style="margin-top:12px">
+          <button class="btn primary" onclick="checkUpdate()">CHECK FOR UPDATE</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-t">Latest Available</div>
+        <div class="kv"><span class="kv-k">Version</span><span class="kv-v" id="upd-latest">—</span></div>
+        <div class="kv"><span class="kv-k">Published</span><span class="kv-v" id="upd-pub">—</span></div>
+        <div class="kv"><span class="kv-k">Checked</span><span class="kv-v" id="upd-checked">—</span></div>
+        <div class="kv"><span class="kv-k">Release</span><span class="kv-v" id="upd-release-link">—</span></div>
+        <div id="upd-apply-wrap" style="margin-top:12px;display:none">
+          <button class="btn amber" onclick="applyUpdate()">APPLY UPDATE</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-t">Update History <span class="card-t-r">last 10</span></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Time</th><th>Version</th><th>Status</th><th>Detail</th>
+          </tr></thead>
+          <tbody id="upd-history">
+            <tr><td colspan="4" style="color:var(--dim);text-align:center">No update history</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-t">Rollback</div>
+      <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">
+        If an update causes issues, you can roll back to a previous version.
+        Backups are saved automatically before each update is applied.
+      </p>
+      <div id="upd-rollback-list">
+        <div style="color:var(--dim);font-size:11px">No backups available.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CHAT ── -->
+  <section class="panel" id="panel-chat" style="padding:0">
+    <div id="chat-disabled" style="display:none;padding:20px 18px">
+      <div class="card">
+        <div class="card-t">No Agent Connected</div>
+        <p style="font-size:11px;color:var(--muted);line-height:1.8">
+          Chat is provided by a connected circuit-agent. Set <code style="color:var(--green)">agentDataPath</code>
+          in your node config to point to your agent's <code style="color:var(--green)">data/</code> directory,
+          then restart the node.
+        </p>
+        <p style="font-size:11px;color:var(--muted);line-height:1.8" id="chat-no-agent-reason"></p>
+        <div class="kv" style="margin-top:12px"><span class="kv-k">Setup</span><span class="kv-v green">node node-client.js setup</span></div>
+      </div>
+    </div>
+    <div id="chat-ui" class="chat-wrap" style="display:none">
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-status-bar">
+        <span class="chat-conn-dot" id="chat-dot"></span>
+        <span id="chat-status-text">connecting…</span>
+        <span style="float:right;color:var(--dim)" id="chat-model-label">—</span>
+      </div>
+      <div class="chat-bar">
+        <textarea class="chat-input" id="chat-input" placeholder="Ask about your node, the network, Solana…" rows="1"
+          onkeydown="chatKeydown(event)"></textarea>
+        <button class="chat-send" id="chat-send" onclick="chatSend()" disabled>SEND</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── AGENT ── -->
+  <section class="panel" id="panel-agent">
+    <div id="agent-disabled-msg" class="card mb" style="display:none">
+      <div class="card-t">Agent Not Connected</div>
+      <p style="font-size:11px;color:var(--muted);line-height:1.8">
+        To connect a local CIRCUIT trading agent to this node, set
+        <code style="color:var(--green)">node.agentDataPath</code> in
+        <code style="color:var(--green)">config/client.json</code> to the path of your
+        <code style="color:var(--green)">circuit-agent/data</code> directory, then restart the node.
+        <br><br>
+        Example: <code style="color:var(--green)">"agentDataPath": "../circuit-agent/data"</code><br><br>
+        Pair an agent to enable the chat interface and agent dashboard tab. The agent uses your node's
+        pnk_ RPC key for Solana calls. Data API calls (x402) apply normally.
+      </p>
+    </div>
+
+    <div id="agent-content" style="display:none">
+      <div class="chips chips-3 mb">
+        <div class="chip"><div class="chip-l">Agent Status</div><div class="chip-v" id="ag-status">—</div></div>
+        <div class="chip"><div class="chip-l">Open Positions</div><div class="chip-v green" id="ag-positions">—</div></div>
+        <div class="chip"><div class="chip-l">Unrealized P&amp;L</div><div class="chip-v" id="ag-pnl">—</div></div>
+      </div>
+
+      <div class="card mb">
+        <div class="card-t">Agent Info</div>
+        <div class="kv"><span class="kv-k">Agent ID</span><span class="kv-v" id="ag-id">—</span></div>
+        <div class="kv"><span class="kv-k">Wallet</span><span class="kv-v" id="ag-wallet">—</span></div>
+        <div class="kv"><span class="kv-k">API calls today</span><span class="kv-v">Free (local node)</span></div>
+      </div>
+
+      <div id="ag-positions-card" class="card mb" style="display:none">
+        <div class="card-t">Open Positions</div>
+        <div id="ag-positions-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-t">Recent Trades</div>
+        <div class="log-box" id="ag-log">
+          <div class="log-line"><span class="ts">—</span><span class="msg">No recent trades…</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+'use strict';
+
+// ── State ────────────────────────────────────────────────────────────────────
+const PORT     = location.port || 19000;
+const BASE     = location.origin;
+let nodeData   = {};
+let netData    = {};
+let updateData = {};
+const logLines = [];
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function $(id) { return document.getElementById(id); }
+
+function txt(id, val, cls) {
+  const el = $(id);
+  if (!el) return;
+  el.textContent = val ?? '—';
+  if (cls) { el.className = el.className.replace(/\b(green|amber|red|teal)\b/g, ''); el.classList.add(cls); }
+}
+
+function fmtUptime(secs) {
+  if (secs == null) return '—';
+  const d = Math.floor(secs / 86400), h = Math.floor(secs % 86400 / 3600),
+        m = Math.floor(secs % 3600 / 60), s = Math.floor(secs % 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  return `${m}m ${s}s`;
+}
+
+function fmtTs(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function fmtAgo(iso) {
+  if (!iso) return '—';
+  const s = Math.round((Date.now() - new Date(iso)) / 1000);
+  if (s < 60)  return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  return `${Math.floor(s/3600)}h ago`;
+}
+
+async function api(path) {
+  try {
+    const r = await fetch(BASE + path);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } catch { return null; }
+}
+
+function showTab(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  $('panel-' + id)?.classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => {
+    if (t.getAttribute('onclick')?.includes(id)) t.classList.add('active');
+  });
+  if (id === 'network') renderNetwork();
+  if (id === 'updates') renderUpdates();
+  if (id === 'agent')   { loadAgentData(); }
+  if (id === 'chat')    renderChat();
+  if (id === 'rpc')     loadStakeConfig();
+}
+
+function addLog(msg, type = '') {
+  const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  logLines.unshift({ ts, msg, type });
+  if (logLines.length > 30) logLines.pop();
+  renderLog();
+}
+
+function renderLog() {
+  const box = $('ov-log');
+  if (!box) return;
+  box.innerHTML = logLines.slice(0, 10).map(l =>
+    `<div class="log-line ${l.type}"><span class="ts">${l.ts}</span><span class="msg">${l.msg}</span></div>`
+  ).join('');
+}
+
+// ── Copy ──────────────────────────────────────────────────────────────────────
+function copyKey(valId, copiedId) {
+  const val = $(valId)?.textContent?.trim();
+  if (!val || val === 'generating…' || val === 'loading…') return;
+  navigator.clipboard.writeText(val).then(() => {
+    const el = $(copiedId);
+    if (!el) return;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1800);
+  });
+}
+
+// ── Load node status ──────────────────────────────────────────────────────────
+async function loadStatus() {
+  const data = await api('/health');
+  if (!data) {
+    txt('h-status', 'OFFLINE', 'red');
+    $('live-dot')?.classList.add('red');
+    return;
+  }
+  nodeData = data;
+
+  // Header
+  const statusText = data.status === 'ok' ? 'ONLINE' : 'ERROR';
+  txt('h-status', statusText, data.status === 'ok' ? 'green' : 'red');
+  txt('h-version', data.version ?? '—');
+  txt('h-uptime', fmtUptime(data.uptime));
+  const syncSt = data.sync?.status;
+  txt('h-sync', syncSt === 'disabled' ? 'OFF' : (syncSt?.toUpperCase() ?? '—'),
+    syncSt === 'synced' ? 'green' : syncSt === 'lagging' ? 'amber' : syncSt === 'disabled' ? '' : '');
+  txt('h-agent', data.agentRunning ? 'RUNNING' : 'OFF',
+    data.agentRunning ? 'green' : '');
+
+  // Live dot
+  const dot = $('live-dot');
+  if (dot) {
+    dot.className = 'live-dot' + (data.status === 'ok' ? '' : ' red');
+  }
+
+  // Header node ID
+  txt('hdr-node-id', 'ID: ' + (data.nodeId ?? '—'));
+
+  // Overview panel
+  txt('ov-nodeid', data.nodeId ?? '—');
+  txt('ov-version', data.version ?? '—');
+  txt('ov-uptime', fmtUptime(data.uptime), 'green');
+
+  const ring = $('ov-ring');
+  const ringStatus = data.status === 'ok' ? 'online' : 'offline';
+  if (ring) ring.className = 'ring ' + ringStatus;
+  txt('ov-status-text', ringStatus.toUpperCase(),
+    ringStatus === 'online' ? 'green' : 'red');
+
+  // Sync
+  const sync = data.sync ?? {};
+  txt('ov-sync-protocol', sync.protocol === 'disabled' ? 'disabled (Phase 2)' : (sync.protocol ?? '—'));
+  txt('ov-sync-status', sync.status === 'disabled' ? 'DISABLED' : (sync.status?.toUpperCase() ?? '—'),
+    sync.status === 'synced' ? 'green' : sync.status === 'lagging' ? 'amber' : '');
+  txt('ov-sync-lag', sync.lagMs != null ? sync.lagMs + 'ms' : '—');
+  txt('ov-sync-last', fmtAgo(sync.lastSyncAt));
+  txt('ov-sync-slot', sync.slotHeight?.toLocaleString() ?? '—');
+
+  addLog('Status refreshed — node ' + (data.status === 'ok' ? 'online' : 'error'), data.status === 'ok' ? 'ok' : 'err');
+}
+
+// ── Load node identity ────────────────────────────────────────────────────────
+async function loadIdentity() {
+  const data = await api('/node');
+  if (!data) return;
+
+  txt('ov-region', data.region ?? '—');
+  txt('ov-port', data.apiPort ?? PORT);
+
+  // Shards
+  const shardEl = $('ov-shards');
+  if (shardEl) {
+    shardEl.innerHTML = (data.shards ?? ['all']).map(s =>
+      `<span class="shard-pill">${s}</span>`
+    ).join('');
+  }
+
+  // RPC key panel
+  const nodeId = data.nodeId ?? '';
+  txt('nodeid-val', nodeId);
+  // Derive RPC key from nodeId (first 43 chars of base64, prefixed)
+  const rpcKey = 'pnk_' + nodeId.replace(/[^A-Za-z0-9]/g, '').slice(0, 40);
+  txt('rpc-key-val', rpcKey);
+  txt('rpc-base-url', `http://localhost:${PORT}`);
+  txt('ex-url-1', `http://localhost:${PORT}`);
+  txt('h-agent', data.agentRunning ? 'RUNNING' : 'OFF', data.agentRunning ? 'green' : '');
+}
+
+// ── Load network map ──────────────────────────────────────────────────────────
+async function loadNetwork() {
+  const data = await api('/api/network/nodes/map');
+  if (!data) {
+    netData = { _unavailable: true };
+    return;
+  }
+  netData = data;
+
+  const stats = data.stats ?? {};
+  txt('ov-online', stats.online ?? '—', 'green');
+  txt('ov-agents', stats.withAgent ?? '—');
+  txt('ov-map-ts', fmtAgo(stats.asOf));
+  txt('h-peers', (stats.online ?? 0));
+
+  // Determine our rank (position in node list by firstSeenAt)
+  const myNode = await api('/node');
+  if (myNode?.nodeId && data.nodes) {
+    const sorted = [...data.nodes].sort((a,b) => new Date(a.firstSeenAt) - new Date(b.firstSeenAt));
+    const idx    = sorted.findIndex(n => n.nodeId === myNode.nodeId);
+    txt('ov-rank', idx >= 0 ? '#' + (idx + 1) : '—');
+  }
+
+  // Version
+  const versions = Object.keys(stats.versions ?? {});
+  txt('ov-netver', versions.length ? versions.sort().pop() : '—');
+}
+
+async function loadHubStatus() {
+  const data = await api('/network/hub');
+  if (!data) return;
+  txt('net-hub-url', data.url ?? '—');
+  const reachable = data.reachable !== false;
+  const ring = $('net-hub-ring');
+  if (ring) ring.className = 'ring ' + (reachable ? 'online' : 'offline');
+  txt('net-hub-status', reachable ? 'ONLINE' : 'UNREACHABLE', reachable ? 'green' : 'red');
+  txt('net-hub-version', data.version ?? '—');
+  txt('net-hub-service', data.service ?? 'circuit-node');
+  txt('net-hub-rpc', data.rpc ?? '—');
+}
+
+function renderNetwork() {
+  loadHubStatus();
+  if (!netData.stats) {
+    loadNetwork();
+    if (netData._unavailable) {
+      // Canonical registry unreachable — show clear message
+      const peerEl = $('net-peers');
+      if (peerEl) peerEl.innerHTML = '<div class="empty"><div class="empty-icon">◌</div><p>Registry temporarily unreachable</p><p style="margin-top:6px;font-size:10px;color:var(--dim)">Could not reach node.circuitllm.xyz — check your connection or try again shortly</p></div>';
+      ['net-total','net-online','net-offline','net-agents'].forEach(id => txt(id, '—'));
+    }
+    return;
+  }
+  const stats = netData.stats ?? {};
+  const nodes = netData.nodes ?? [];
+
+  txt('net-total',   stats.total   ?? '—');
+  txt('net-online',  stats.online  ?? '—', 'green');
+  txt('net-offline', stats.offline ?? '—', stats.offline > 0 ? 'amber' : '');
+  txt('net-agents',  stats.withAgent ?? '—');
+  txt('net-ts', fmtAgo(stats.asOf));
+
+  // Shard coverage
+  const shardEl = $('net-shards');
+  if (shardEl) {
+    const cov = stats.shardCoverage ?? {};
+    const keys = Object.keys(cov);
+    shardEl.innerHTML = keys.length ? keys.map(k =>
+      `<div class="kv"><span class="kv-k">${k}</span><span class="kv-v ${cov[k] >= 3 ? 'green' : 'amber'}">${cov[k]} node${cov[k] !== 1 ? 's' : ''}</span></div>`
+    ).join('') : '<div class="kv"><span class="kv-k" style="color:var(--dim)">No shard data</span></div>';
+  }
+
+  // Version distribution
+  const verEl = $('net-versions');
+  if (verEl) {
+    const vers = stats.versions ?? {};
+    const vkeys = Object.keys(vers);
+    verEl.innerHTML = vkeys.length ? vkeys.sort().map(v =>
+      `<div class="kv"><span class="kv-k">v${v}</span><span class="kv-v">${vers[v]} node${vers[v] !== 1 ? 's' : ''}</span></div>`
+    ).join('') : '<div class="kv"><span class="kv-k" style="color:var(--dim)">No version data</span></div>';
+  }
+
+  // Peer grid
+  const peerEl = $('net-peers');
+  if (!peerEl) return;
+  if (!nodes.length) {
+    peerEl.innerHTML = '<div class="empty"><div class="empty-icon">◌</div><p>No nodes registered yet. Be the first.</p></div>';
+    return;
+  }
+  peerEl.innerHTML = nodes.map(n => {
+    const statusCls = n.status === 'online' ? 'b-green' : n.status === 'syncing' ? 'b-amber' : 'b-dim';
+    const shards    = (n.shards ?? ['all']).map(s => `<span class="shard-pill">${s}</span>`).join('');
+    return `
+      <div class="peer-card">
+        <div class="peer-id">${n.nodeId.slice(0,20)}…</div>
+        <div class="kv" style="border-bottom:none;padding:2px 0">
+          <span class="kv-k">Version</span>
+          <span class="kv-v">v${n.version ?? '?'}</span>
+        </div>
+        <div class="kv" style="border-bottom:none;padding:2px 0">
+          <span class="kv-k">Region</span>
+          <span class="kv-v">${n.region ?? 'unknown'}</span>
+        </div>
+        <div class="kv" style="border-bottom:none;padding:2px 0">
+          <span class="kv-k">Uptime</span>
+          <span class="kv-v">${fmtUptime(n.uptime)}</span>
+        </div>
+        <div class="peer-meta">
+          <span class="badge ${statusCls}">${n.status.toUpperCase()}</span>
+          ${n.agentRunning ? '<span class="badge b-teal">AGENT</span>' : ''}
+        </div>
+        <div class="shard-list" style="margin-top:6px">${shards}</div>
+      </div>`;
+  }).join('');
+}
+
+// ── Updates ───────────────────────────────────────────────────────────────────
+async function loadUpdateInfo() {
+  const status = await api('/update/status');
+  updateData = status ?? {};
+
+  txt('upd-current', status?.current ? 'v' + status.current : '—', 'green');
+  txt('upd-auto',      status?.autoUpdate ? 'Enabled' : 'Disabled', status?.autoUpdate ? 'green' : 'red');
+  txt('upd-autoapply', status?.autoApply  ? 'Enabled' : 'Manual',   status?.autoApply  ? 'green' : '');
+  txt('upd-interval',  status?.checkIntervalMs ? Math.round(status.checkIntervalMs / 60_000) + ' min' : '—');
+
+  const repoEl = $('upd-source');
+  if (repoEl && status?.githubRepo) {
+    repoEl.textContent = '';
+    const a = document.createElement('a');
+    a.href = 'https://github.com/' + status.githubRepo.replace(/[^a-zA-Z0-9\-_./]/g, '');
+    a.target = '_blank';
+    a.style.cssText = 'color:var(--muted);text-decoration:none';
+    a.textContent = status.githubRepo + ' ↗';
+    repoEl.appendChild(a);
+  }
+
+  if (status?.latest) {
+    txt('upd-latest', 'v' + status.latest, status.updateAvailable ? 'amber' : 'green');
+    txt('upd-pub',    status.publishedAt ? fmtAgo(status.publishedAt) : '—');
+    txt('upd-checked', status.checkedAt ? fmtAgo(status.checkedAt) : '—');
+    const relEl = $('upd-release-link');
+    if (relEl) {
+      relEl.textContent = '';
+      // Only use URL if it's a genuine GitHub HTTPS link — reject anything else
+      if (status.releaseUrl && /^https:\/\/github\.com\//.test(status.releaseUrl)) {
+        const a = document.createElement('a');
+        a.href = status.releaseUrl;
+        a.target = '_blank';
+        a.style.cssText = 'color:var(--muted);text-decoration:none';
+        a.textContent = 'View on GitHub ↗';
+        relEl.appendChild(a);
+      } else {
+        relEl.textContent = '—';
+      }
+    }
+  } else {
+    txt('upd-latest',  status?.error ? 'Unreachable' : 'Up to date', status?.error ? 'red' : 'green');
+    txt('upd-pub',     '—');
+    txt('upd-checked', status?.checkedAt ? fmtAgo(status.checkedAt) : '—');
+    txt('upd-release-link', '—');
+  }
+
+  // Update history table
+  const rows = (status?.history ?? []).slice().reverse();
+  const tbody = $('upd-history');
+  if (tbody) {
+    tbody.innerHTML = rows.length ? rows.map(h => `
+      <tr>
+        <td>${fmtAgo(h.at)}</td>
+        <td>${_esc('v' + (h.version ?? '?'))}</td>
+        <td style="color:${h.status === 'applied' ? 'var(--green)' : h.status === 'failed' ? 'var(--red)' : 'var(--muted)'}">${_esc(h.status ?? '—')}</td>
+        <td style="color:var(--dim)">${_esc(h.method ?? h.reason ?? '')}</td>
+      </tr>`).join('')
+      : '<tr><td colspan="4" style="color:var(--dim);text-align:center">No update history</td></tr>';
+  }
+
+  // Rollback list — use data-version + event listener, not onclick interpolation
+  const backups = status?.backups ?? [];
+  const rollbackEl = $('upd-rollback-list');
+  if (rollbackEl) {
+    if (backups.length) {
+      rollbackEl.innerHTML = backups.map(v =>
+        `<div class="kv"><span class="kv-k">v${_esc(v)}</span><button class="btn upd-rb-btn" data-v="${_esc(v)}">RESTORE</button></div>`
+      ).join('');
+      rollbackEl.querySelectorAll('.upd-rb-btn').forEach(btn => {
+        btn.addEventListener('click', () => doRollback(btn.dataset.v));
+      });
+    } else {
+      rollbackEl.innerHTML = '<div style="color:var(--dim);font-size:11px">No backups available.</div>';
+    }
+  }
+}
+
+function renderUpdates() {
+  loadUpdateInfo();
+}
+
+async function checkUpdate() {
+  addLog('Checking GitHub for updates…');
+  await loadUpdateInfo();
+  const status = updateData;
+  if (!status?.updateAvailable) {
+    addLog(status?.error ? 'Could not reach GitHub' : 'Already up to date', status?.error ? 'err' : 'ok');
+    return;
+  }
+  addLog(`Update available: v${status.current} → v${status.latest}`, 'warn');
+  $('upd-apply-wrap').style.display = 'block';
+  const banner = $('update-banner-wrap');
+  if (banner) {
+    banner.innerHTML = `
+      <div class="update-banner mb">
+        <div>
+          <h3>Update Available — v${_esc(status.latest)}</h3>
+          <p>Published ${status.publishedAt ? fmtAgo(status.publishedAt) : 'recently'}. Apply now or let auto-update handle it.</p>
+        </div>
+        <button class="btn amber" onclick="applyUpdate()">APPLY NOW</button>
+      </div>`;
+  }
+}
+
+async function applyUpdate() {
+  if (!confirm('Apply update now? The node will restart automatically.')) return;
+  addLog('Triggering update — node will restart shortly…', 'warn');
+  try {
+    const res = await fetch('/update/apply', { method: 'POST' });
+    const data = await res.json();
+    if (data.triggered) {
+      addLog('Update triggered. Watch for the node to come back online.', 'warn');
+    } else {
+      addLog('Update trigger failed: ' + (data.error ?? 'unknown'), 'err');
+    }
+  } catch (err) {
+    addLog('Could not reach node: ' + err.message, 'err');
+  }
+}
+
+async function doRollback(version) {
+  if (!confirm(`Roll back to v${version}? The node will restart.`)) return;
+  addLog(`Rolling back to v${version}…`, 'warn');
+  try {
+    const res = await fetch('/update/rollback', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ version }),
+    });
+    const data = await res.json();
+    if (data.triggered) {
+      addLog(`Rollback to v${version} triggered.`, 'warn');
+    } else {
+      addLog('Rollback failed: ' + (data.error ?? 'unknown'), 'err');
+    }
+  } catch (err) {
+    addLog('Could not reach node: ' + err.message, 'err');
+  }
+}
+
+// ── Agent panel ───────────────────────────────────────────────────────────────
+let _agentData = null;
+
+function _esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderAgent() {
+  const connected = _agentData?.connected ?? false;
+  $('agent-disabled-msg').style.display = connected ? 'none' : 'block';
+  $('agent-content').style.display      = connected ? 'block' : 'none';
+  if (!connected) return;
+
+  const d = _agentData;
+  $('ag-status').textContent  = d.alive ? 'RUNNING' : 'STOPPED';
+  $('ag-status').style.color  = d.alive ? 'var(--green)' : 'var(--red)';
+  $('ag-positions').textContent = d.openPositions ?? 0;
+  const pnl = d.pnlSol ?? 0;
+  $('ag-pnl').textContent     = (pnl >= 0 ? '+' : '') + pnl.toFixed(4) + ' SOL';
+  $('ag-pnl').style.color     = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  $('ag-id').textContent      = d.agentId ?? '—';
+  $('ag-wallet').textContent  = d.address ? d.address.slice(0, 8) + '…' + d.address.slice(-4) : '—';
+
+  // Open positions list
+  const posList = d.positions ?? [];
+  $('ag-positions-card').style.display = posList.length ? 'block' : 'none';
+  if (posList.length) {
+    const rows = posList.map(p => {
+      let val, col;
+      if (p.pnlPct != null) {
+        val = (p.pnlPct >= 0 ? '+' : '') + p.pnlPct.toFixed(1) + '%';
+        col = p.pnlPct >= 0 ? 'var(--green)' : 'var(--red)';
+      } else if (p.entryTime) {
+        const mins = Math.round((Date.now() - new Date(p.entryTime).getTime()) / 60000);
+        val = mins + 'm held';
+        col = 'var(--muted)';
+      } else {
+        val = 'open';
+        col = 'var(--muted)';
+      }
+      return `<div class="kv"><span class="kv-k">${_esc(p.symbol)}</span><span class="kv-v" style="color:${col}">${_esc(val)}</span></div>`;
+    });
+    $('ag-positions-list').innerHTML = rows.join('');
+  }
+
+  // Recent trades log
+  const trades = d.recentTrades ?? [];
+  if (trades.length) {
+    const lines = trades.map(t => {
+      const ts  = t.ts ? new Date(t.ts).toLocaleTimeString() : '—';
+      const pnlStr = t.pnlSol != null ? (t.pnlSol >= 0 ? ' +' : ' ') + t.pnlSol.toFixed(4) + ' SOL' : '';
+      const col = t.pnlSol != null ? (t.pnlSol >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--muted)';
+      return `<div class="log-line"><span class="ts">${_esc(ts)}</span><span class="msg" style="color:${col}">${_esc((t.side ?? '?').toUpperCase())} ${_esc(t.symbol)}${_esc(pnlStr)}</span></div>`;
+    });
+    $('ag-log').innerHTML = lines.join('');
+  }
+}
+
+async function loadAgentData() {
+  try {
+    const r = await fetch(`${BASE}/agent/status`);
+    if (r.ok) { _agentData = await r.json(); renderAgent(); }
+  } catch {}
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+let chatWs        = null;
+let chatConnected = false;
+let chatPending   = false;
+let chatCurrentEl = null;  // current streaming message element
+
+function renderChat() {
+  // Show/hide based on whether WS connects
+  $('chat-disabled').style.display = 'none';
+  $('chat-ui').style.display       = 'flex';
+  if (!chatWs || chatWs.readyState > 1) chatConnect();
+}
+
+function chatConnect() {
+  const wsUrl = `ws://${location.host}/chat`;
+  try { chatWs = new WebSocket(wsUrl); } catch {
+    _chatStatus(false, 'WebSocket not supported');
+    return;
+  }
+
+  chatWs.onopen = () => {
+    chatConnected = true;
+    _chatStatus(true, 'Connected');
+    $('chat-send').disabled = false;
+  };
+
+  chatWs.onclose = () => {
+    chatConnected = false;
+    chatPending   = false;
+    _chatStatus(false, 'Disconnected — chat not enabled or node restarting');
+    $('chat-send').disabled = true;
+    $('chat-disabled').style.display = 'block';
+    $('chat-ui').style.display       = 'none';
+    // Try reconnect in 5s
+    setTimeout(() => { if ($('panel-chat').classList.contains('active')) chatConnect(); }, 5000);
+  };
+
+  chatWs.onerror = () => {
+    chatConnected = false;
+    _chatStatus(false, 'Connection failed — is chat enabled in config?');
+    $('chat-disabled').style.display = 'block';
+    $('chat-ui').style.display       = 'none';
+  };
+
+  chatWs.onmessage = (evt) => {
+    let msg;
+    try { msg = JSON.parse(evt.data); } catch { return; }
+
+    if (msg.type === 'no-agent') {
+      // Agent not connected — show the disabled panel with reason
+      const reason = $('chat-no-agent-reason');
+      if (reason && msg.reason) reason.textContent = msg.reason;
+      $('chat-disabled').style.display = 'block';
+      $('chat-ui').style.display       = 'none';
+    } else if (msg.type === 'context') {
+      txt('chat-model-label', msg.model ?? '—');
+      _chatAppend(`Node ${msg.nodeId} · v${msg.version} · ${msg.status}`, 'system');
+      const agentLabel = msg.agentId ? msg.agentId.slice(0, 16) + '…' : 'agent';
+      $('chat-input').placeholder = 'Talk to your agent — ask about positions, trades, strategy…';
+      _chatAppend('Agent ' + agentLabel + ' connected', 'system');
+      _chatAppend('Hey. What do you want to know?', 'assistant');
+    } else if (msg.type === 'chunk') {
+      if (!chatCurrentEl) {
+        chatCurrentEl = _chatAppend('', 'assistant', true);
+      }
+      // Append chunk, keep cursor at end
+      const cursor = chatCurrentEl.querySelector('.chat-cursor');
+      if (cursor) cursor.insertAdjacentText('beforebegin', msg.content);
+      else chatCurrentEl.textContent += msg.content;
+      _scrollChat();
+    } else if (msg.type === 'done') {
+      // Remove cursor
+      chatCurrentEl?.querySelector('.chat-cursor')?.remove();
+      chatCurrentEl = null;
+      chatPending   = false;
+      $('chat-send').disabled = false;
+    } else if (msg.type === 'error') {
+      chatCurrentEl?.querySelector('.chat-cursor')?.remove();
+      chatCurrentEl = null;
+      chatPending   = false;
+      $('chat-send').disabled = false;
+      _chatAppend('Error: ' + (msg.message ?? 'Unknown error'), 'error');
+    }
+  };
+}
+
+function chatSend() {
+  if (!chatConnected || chatPending) return;
+  const input = $('chat-input');
+  const text  = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = '';
+  chatPending = true;
+  $('chat-send').disabled = true;
+
+  _chatAppend(text, 'user');
+
+  try {
+    chatWs.send(JSON.stringify({ type: 'message', content: text }));
+  } catch (err) {
+    _chatAppend('Send failed: ' + err.message, 'error');
+    chatPending = false;
+    $('chat-send').disabled = false;
+  }
+}
+
+function chatKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    chatSend();
+  }
+  // Auto-resize textarea
+  const el = e.target;
+  el.style.height = '';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+function _chatAppend(text, role, streaming = false) {
+  const box = $('chat-messages');
+  if (!box) return null;
+  const el = document.createElement('div');
+  el.className = 'chat-msg ' + role;
+  el.textContent = text;
+  if (streaming) {
+    const cursor = document.createElement('span');
+    cursor.className = 'chat-cursor';
+    el.appendChild(cursor);
+  }
+  box.appendChild(el);
+  _scrollChat();
+  return el;
+}
+
+function _scrollChat() {
+  const box = $('chat-messages');
+  if (box) box.scrollTop = box.scrollHeight;
+}
+
+function _chatStatus(connected, text) {
+  const dot = $('chat-dot');
+  if (dot) dot.className = 'chat-conn-dot' + (connected ? ' connected' : '');
+  txt('chat-status-text', text);
+}
+
+// ── Staking Access ────────────────────────────────────────────────────────────
+let _stakeWallet = localStorage.getItem('stake_wallet') || null;
+let _stakeConfig = null;
+
+async function loadStakeConfig() {
+  const data = await api('/stake/check');
+  if (!data) return;
+
+  if (!data.configured) {
+    $('stake-not-configured').style.display  = 'block';
+    $('stake-connect-prompt').style.display  = 'none';
+    return;
+  }
+
+  _stakeConfig = data;
+  txt('stake-min-display', (data.minRequired ?? 0).toLocaleString() + ' CIRC', 'amber');
+
+  const poolUrl = data.poolUrl ?? 'https://stakepoint.app';
+  ['stake-pool-link', 'stake-go-link', 'stake-action-link'].forEach(id => {
+    const el = $(id); if (el) el.href = poolUrl;
+  });
+
+  if (_stakeWallet) {
+    await checkStake(_stakeWallet);
+  }
+}
+
+async function connectStakeWallet() {
+  const provider = window.phantom?.solana || window.solana || window.solflare;
+  if (!provider) {
+    alert('No Solana wallet detected.\n\nInstall Phantom (phantom.app) or Solflare (solflare.com) to connect your wallet.');
+    return;
+  }
+  try {
+    const resp = await provider.connect();
+    _stakeWallet = (resp?.publicKey ?? provider.publicKey)?.toString();
+    if (!_stakeWallet) throw new Error('No public key returned');
+    localStorage.setItem('stake_wallet', _stakeWallet);
+    addLog('Wallet connected: ' + _stakeWallet.slice(0,8) + '…', 'ok');
+    await checkStake(_stakeWallet);
+  } catch (err) {
+    if (err.code !== 4001) {  // 4001 = user rejected
+      addLog('Wallet connect failed: ' + err.message, 'err');
+      alert('Wallet connection failed: ' + err.message);
+    }
+  }
+}
+
+function disconnectStakeWallet() {
+  _stakeWallet = null;
+  localStorage.removeItem('stake_wallet');
+  $('stake-status-panel').style.display  = 'none';
+  $('stake-connect-prompt').style.display = 'block';
+  $('stake-ts').textContent = '—';
+  addLog('Wallet disconnected', '');
+}
+
+async function refreshStake() {
+  if (_stakeWallet) await checkStake(_stakeWallet);
+}
+
+async function checkStake(wallet) {
+  if (!wallet) return;
+
+  $('stake-connect-prompt').style.display = 'none';
+  $('stake-status-panel').style.display   = 'none';
+  $('stake-loading').style.display        = 'block';
+
+  const data = await api(`/stake/check?wallet=${encodeURIComponent(wallet)}`);
+  $('stake-loading').style.display = 'none';
+
+  if (!data || !data.configured) {
+    $('stake-connect-prompt').style.display = 'block';
+    return;
+  }
+
+  $('stake-status-panel').style.display = 'block';
+  txt('stake-ts', new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}));
+
+  // Wallet tag
+  const shortAddr = wallet.slice(0, 4) + '…' + wallet.slice(-4);
+  txt('stake-wallet-short', shortAddr);
+
+  // Amounts
+  const staked  = data.stakedAmount ?? 0;
+  const minReq  = data.minRequired  ?? 0;
+  txt('stake-req-display',    minReq.toLocaleString() + ' CIRC');
+  txt('stake-amount-display', staked.toLocaleString(undefined, {maximumFractionDigits: 2}) + ' CIRC',
+    staked >= minReq ? 'green' : 'red');
+
+  // Progress bar
+  const pct = minReq > 0 ? Math.min(100, (staked / minReq) * 100) : (staked > 0 ? 100 : 0);
+  const fill = $('stake-progress-fill');
+  if (fill) fill.style.width = pct.toFixed(1) + '%';
+
+  // Lock
+  if (data.lockUntil) {
+    const d   = new Date(data.lockUntil * 1000);
+    const fmt = d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+    txt('stake-lock-display', fmt + (data.lockActive ? ' (active)' : ' (expired)'),
+      data.lockActive ? 'green' : 'amber');
+  } else {
+    txt('stake-lock-display', staked > 0 ? 'No lock period' : '—');
+  }
+
+  // Position address
+  txt('stake-position-display',
+    data.positionAddress ? data.positionAddress.slice(0,12) + '…' + data.positionAddress.slice(-6) : '—');
+
+  // Access status
+  const label = $('stake-access-label');
+  if (label) {
+    label.className = 'stake-access-status ' + (data.eligible ? 'unlocked' : 'locked');
+    label.textContent = data.eligible ? '● UNLOCKED' : '○ STAKE REQUIRED';
+  }
+
+  if (data.eligible) {
+    addLog('Stake verified — access UNLOCKED (' + staked.toLocaleString() + ' CIRC)', 'ok');
+  } else if (staked > 0) {
+    addLog('Stake insufficient: ' + staked.toLocaleString() + ' / ' + minReq.toLocaleString() + ' CIRC', 'warn');
+  } else {
+    addLog('No stake found for wallet ' + shortAddr, 'warn');
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  addLog('Dashboard loaded', 'ok');
+  await loadStatus();
+  await loadIdentity();
+  await loadNetwork();
+  await loadStakeConfig();
+
+  // Poll every 15s; refresh agent data if tab is active
+  setInterval(async () => {
+    await loadStatus();
+    await loadNetwork();
+    if ($('panel-agent')?.classList.contains('active')) await loadAgentData();
+    if ($('panel-rpc')?.classList.contains('active') && _stakeWallet) await checkStake(_stakeWallet);
+  }, 15_000);
+}
+
+init();
+</script>
+</body></html>

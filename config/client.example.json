@@ -1,0 +1,58 @@
+{
+  "_comment": "circuit-node-client configuration. Edit before first run.",
+
+  "network": {
+    "registryUrl":    "https://node.circuitllm.xyz",
+    "bootstrapUrl":   "https://node.circuitllm.xyz",
+    "bootstrapPort":  18500,
+    "networkVersion": 1,
+    "solanaRpcUrl":   "https://api.mainnet-beta.solana.com"
+  },
+
+  "node": {
+    "version":        "0.1.0",
+    "region":         "unknown",
+    "apiPort":        19000,
+    "agentEnabled":   false,
+    "agentDataPath":  null,
+    "_agentNote":     "Set agentDataPath to your circuit-agent/data directory to connect an agent. E.g.: \"../circuit-agent/data\"",
+    "shards":         ["all"],
+    "phase":          1
+  },
+
+  "heartbeat": {
+    "intervalMs":   60000,
+    "maxMissed":    3
+  },
+
+  "sync": {
+    "enabled":      false,
+    "protocol":     "grpc",
+    "grpcEndpoint": null,
+    "intervalMs":   5000,
+    "maxLagMs":     30000
+  },
+
+  "access": {
+    "encryptionEnabled": false,
+    "circWalletAddress": null,
+    "minCircBalance":   100,
+    "circMint":         "8fQgfsRnRkKSeNUhevT7wp8mhNvMSJdLn1fJi4oVpump"
+  },
+
+  "updates": {
+    "autoUpdate":         true,
+    "checkIntervalMs":    3600000,
+    "signingPublicKey":   null,
+    "_signingNote":       "Operator public key for verifying signed updates. Set by generate-signing-key.js output. Leave null to skip verification (not recommended for production)."
+  },
+
+  "chat": {
+    "maxHistory": 20,
+    "_note": "Chat is provided by the connected circuit-agent. No LLM key needed here — the agent's own llm.openrouterKey is used automatically."
+  },
+
+  "logging": {
+    "level": "info"
+  }
+}

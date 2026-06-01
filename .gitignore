@@ -1,0 +1,27 @@
+# Node
+node_modules/
+
+# Local config — edit config/client.example.json, then copy to client.json
+# client.json is gitignored so git pull never overwrites your settings
+config/client.json
+
+# Runtime data — never commit
+data/identity.json
+data/signing-key.json
+data/update-history.json
+data/cache/
+data/staging/
+data/backups/
+data/dist/
+data/*.log
+*.log
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.secret
+
+# OS
+.DS_Store
+Thumbs.db
