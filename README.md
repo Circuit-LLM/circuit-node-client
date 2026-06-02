@@ -30,7 +30,7 @@ cd circuit-node-client
 npm install
 
 # Start
-node node-client.js start
+node node-client.js
 
 # Dashboard
 open http://localhost:19000
@@ -68,10 +68,10 @@ Edit `config/client.json` before first run:
 ## CLI Commands
 
 ```bash
-node node-client.js start              # Start the node (default)
-node node-client.js setup              # Show identity and current config
+node node-client.js                    # Start the node (default)
+node node-client.js setup              # Interactive setup wizard
 node node-client.js status             # Check node + network status
-node node-client.js update             # Check and apply updates manually
+node node-client.js update             # Check GitHub for updates and apply
 node node-client.js rollback           # List available rollback targets
 node node-client.js rollback <version> # Roll back to a specific version
 node node-client.js deregister         # Remove from network and exit
@@ -182,26 +182,28 @@ Get an OpenRouter key at [openrouter.ai](https://openrouter.ai).
 
 ## Updates
 
-Updates are cryptographically signed by Circuit LLM (the canonical node operator) using an ed25519 keypair. Clients verify the signature and SHA-256 checksum before applying any update.
+The node-client checks the [Circuit-LLM/circuit-node-client](https://github.com/Circuit-LLM/circuit-node-client) GitHub releases page every hour and applies updates automatically when a newer version is available.
 
 **Update flow:**
-1. Poll `GET /api/network/updates/latest` every 60 minutes
-2. If a newer version is available, download the archive
-3. Verify SHA-256 checksum
-4. Verify Circuit LLM ed25519 signature
-5. Backup current installation
-6. Swap in new files (preserves `data/` and `node_modules/`)
-7. `npm install` for new dependencies
-8. `process.exit(0)` → systemd restarts with new code
+1. Poll GitHub Releases API every 60 minutes
+2. Compare latest release tag to local `package.json` version
+3. If newer: backup current installation (preserves `data/` and `node_modules/`)
+4. Pull via `git pull --ff-only` if the directory is a git clone (fastest path)
+5. Fallback: download release tarball from GitHub
+6. `npm install` for any new dependencies
+7. `process.exit(0)` → systemd/PM2 restarts with new code
+
+Updates and rollback history are visible in the dashboard **Updates** tab.
 
 **Disable auto-update:**
 ```json
 "updates": { "autoUpdate": false }
 ```
 
-**Manual update:**
+**Manual update or rollback:**
 ```bash
-node node-client.js update
+node node-client.js update             # Pull latest now
+node node-client.js rollback <version> # Restore a previous backup
 ```
 
 ## Run as a Service (systemd)
@@ -224,7 +226,7 @@ loginctl enable-linger $USER
 | Concern | Protection |
 |---------|-----------|
 | Private key exposure | `data/identity.json` chmod 600, gitignored |
-| Malicious updates | ed25519 signature + SHA-256 checksum verification |
+| Malicious updates | Updates pulled from GitHub via HTTPS — only the repo owner can publish releases |
 | Node impersonation | All registry mutations are signature-verified |
 | External chat access | WebSocket only accepts localhost connections |
 | Phase 3 data access | AES-256-GCM, key requires CIRC token ownership |
@@ -232,21 +234,13 @@ loginctl enable-linger $USER
 **Files that must never be committed:**
 ```
 data/identity.json     ← your node private key
-data/signing-key.json  ← Circuit LLM signing key (operator VPS only)
 ```
 
-Both are in `.gitignore`.
+This file is in `.gitignore`.
 
-## For Operators (Publishing Updates)
+## Publishing Updates (Maintainers)
 
-```bash
-# One-time: generate signing key (operator VPS only)
-node deploy/generate-signing-key.js
-# Copy printed public key into config/client.json → updates.signingPublicKey
-
-# Publish a new version
-REGISTRY_URL=https://node.circuitllm.xyz INTERNAL_KEY=<key> node deploy/publish-update.js
-```
+Create a new GitHub release with a semver tag (e.g. `v0.2.0`). All running node-clients will detect it within their next hourly check and auto-apply if `autoUpdate: true`.
 
 ## Directory Structure
 
