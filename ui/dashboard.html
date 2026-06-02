@@ -362,16 +362,11 @@ tr:last-child td{border-bottom:none}
     <div class="card" id="stake-card">
       <div class="card-t">CIRC Staking Access <span class="card-t-r" id="stake-ts">—</span></div>
 
-      <!-- Pool not configured in config/client.json -->
+      <!-- Pool not configured — show wallet connect anyway so user can see/test the interface -->
       <div id="stake-not-configured" style="display:none">
-        <p style="font-size:11px;color:var(--muted);line-height:1.8">
-          Staking gate not configured. Add to <code style="color:var(--green)">config/client.json</code>:
-        </p>
-        <div style="background:var(--s3);border:1px solid var(--border);padding:10px 12px;font-size:10px;line-height:1.9;color:var(--text);margin-top:10px">
-          <div style="color:var(--muted)">// access section</div>
-          <div style="color:var(--green)">"stakingPool":   "&lt;pool-address&gt;",</div>
-          <div style="color:var(--green)">"stakingPoolId": "&lt;stakepoint-pool-id&gt;",</div>
-          <div style="color:var(--green)">"minStakeCirc":  100000</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:9px;letter-spacing:.12em;color:var(--amber);background:rgba(255,149,0,.08);border:1px solid rgba(255,149,0,.2);padding:2px 8px">POOL PENDING</span>
+          <span style="font-size:10px;color:var(--muted)">Staking pool not yet configured in client.json</span>
         </div>
       </div>
 
@@ -1254,13 +1249,17 @@ async function loadStakeConfig() {
   const data = await api('/stake/check');
   if (!data) return;
 
-  if (!data.configured) {
-    $('stake-not-configured').style.display  = 'block';
-    $('stake-connect-prompt').style.display  = 'none';
-    return;
+  _stakeConfig = data;
+
+  // Show "pool pending" banner if not configured, but still show the wallet UI
+  $('stake-not-configured').style.display = data.configured ? 'none' : 'block';
+
+  // Always show the connect prompt / wallet UI regardless of pool config
+  // so users can connect their wallet and see the interface
+  if (!_stakeWallet) {
+    $('stake-connect-prompt').style.display = 'block';
   }
 
-  _stakeConfig = data;
   txt('stake-min-display', (data.minRequired ?? 0).toLocaleString() + ' CIRC', 'amber');
 
   const poolUrl = data.poolUrl ?? 'https://stakepoint.app';

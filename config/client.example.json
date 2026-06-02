@@ -37,7 +37,13 @@
     "encryptionEnabled": false,
     "circWalletAddress": null,
     "minCircBalance":   100,
-    "circMint":         "8fQgfsRnRkKSeNUhevT7wp8mhNvMSJdLn1fJi4oVpump"
+    "circMint":         "8fQgfsRnRkKSeNUhevT7wp8mhNvMSJdLn1fJi4oVpump",
+
+    "_stakingNote":     "Stake CIRC to unlock free RPC access. Set stakingPool to the Circuit pool address from stakepoint.app.",
+    "stakingPool":      null,
+    "stakingPoolId":    null,
+    "minStakeCirc":     100000,
+    "circDecimals":     6
   },
 
   "updates": {
