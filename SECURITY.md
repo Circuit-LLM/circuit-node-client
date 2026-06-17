@@ -4,7 +4,7 @@
 
 Do **not** open a public GitHub issue for security vulnerabilities.
 
-Email: **security@circuitllm.xyz**
+Email: **circuitllm@protonmail.com**
 
 Include:
 - A description of the vulnerability
