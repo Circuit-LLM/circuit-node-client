@@ -8,7 +8,7 @@
 :root{
   --bg:#09080a;--s1:#110f07;--s2:#161408;--s3:#1c190a;
   --border:#3a2e00;--border2:#503e00;
-  --text:#d8cc90;--muted:#7a6e30;--dim:#2e2800;--bright:#ffe880;
+  --text:#d8cc90;--muted:#9a8c40;--dim:#2e2800;--bright:#ffe880;
   --yellow:#ffe000;--gold:#c9a800;--amber:#ff9500;--red:#cc3333;--green:#7acc60;
   --font:'Courier New',Courier,monospace;
 }
@@ -20,11 +20,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:12
 .hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,224,0,.2),transparent);pointer-events:none}
 .hdr-logo{display:flex;flex-direction:column;justify-content:center;padding-right:20px;border-right:1px solid var(--border2)}
 .hdr-logo-title{font-size:13px;font-weight:700;letter-spacing:.18em;color:var(--yellow);text-shadow:0 0 10px rgba(255,224,0,.6),0 0 24px rgba(255,224,0,.25)}
-.hdr-logo-sub{font-size:8px;letter-spacing:.22em;color:var(--muted);margin-top:2px;text-transform:uppercase}
+.hdr-logo-sub{font-size:9px;letter-spacing:.22em;color:var(--muted);margin-top:2px;text-transform:uppercase}
 .hdr-stats{display:flex;align-items:stretch;flex:1}
 .hstat{display:flex;flex-direction:column;justify-content:center;padding:0 18px;border-right:1px solid var(--border);cursor:default;transition:background .15s}
 .hstat:hover{background:var(--s2)}
-.hstat-l{font-size:8px;letter-spacing:.14em;color:var(--muted);margin-bottom:3px;text-transform:uppercase}
+.hstat-l{font-size:10px;letter-spacing:.12em;color:var(--muted);margin-bottom:3px;text-transform:uppercase}
 .hstat-v{font-size:13px;font-weight:700;color:var(--bright)}
 .hstat-v.green{color:var(--yellow);text-shadow:0 0 6px rgba(255,224,0,.3)}
 .hstat-v.amber{color:var(--amber)}
@@ -34,7 +34,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:12
 .live-dot.amber{background:var(--amber);box-shadow:0 0 8px var(--amber)}
 .live-dot.red{background:var(--red);box-shadow:0 0 8px var(--red)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
-.hdr-node-id{font-size:9px;color:var(--muted);letter-spacing:.06em;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hdr-node-id{font-size:10px;color:var(--muted);letter-spacing:.06em;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* Tabs */
 .tabs{background:var(--s1);border-bottom:1px solid var(--border2);display:flex;padding:0 20px;flex-shrink:0;overflow-x:auto}
@@ -59,7 +59,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:12
 .card::after{content:'';position:absolute;bottom:0;right:0;width:8px;height:8px;border-bottom:1px solid var(--gold);border-right:1px solid var(--gold);opacity:.4;pointer-events:none;z-index:5}
 .card-t{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:-14px -16px 12px;padding:8px 14px;position:relative;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(90deg,var(--s2),var(--s1));border-bottom:1px solid var(--border)}
 .card-t::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,224,0,.12),transparent);pointer-events:none}
-.card-t-r{font-size:9px;color:var(--dim);letter-spacing:.06em}
+.card-t-r{font-size:9px;color:var(--muted);letter-spacing:.06em;opacity:.8}
 
 /* Grid */
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -72,10 +72,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:12
 .chips-4{grid-template-columns:repeat(4,1fr)}
 .chips-3{grid-template-columns:repeat(3,1fr)}
 .chip{background:var(--s2);border:1px solid var(--border2);padding:12px 13px;position:relative}
-.chip-l{font-size:8px;letter-spacing:.14em;color:var(--muted);margin-bottom:7px;text-transform:uppercase}
+.chip-l{font-size:10px;letter-spacing:.12em;color:var(--muted);margin-bottom:7px;text-transform:uppercase}
 .chip-v{font-size:22px;font-weight:700;color:var(--bright);line-height:1}
 .chip-v.green{color:var(--yellow)}
-.chip-s{font-size:9px;color:var(--muted);margin-top:4px}
+.chip-s{font-size:10px;color:var(--muted);margin-top:4px}
 
 /* KV rows */
 .kv{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--dim);font-size:11px}
@@ -89,7 +89,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:12
 /* Tables */
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:11px}
-th{text-align:left;padding:6px 8px;font-size:8px;letter-spacing:.14em;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;text-transform:uppercase}
+th{text-align:left;padding:6px 8px;font-size:10px;letter-spacing:.12em;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;text-transform:uppercase}
 td{padding:6px 8px;border-bottom:1px solid var(--dim);vertical-align:middle}
 tr:hover td{background:var(--s2)}
 tr:last-child td{border-bottom:none}
@@ -105,8 +105,8 @@ tr:last-child td{border-bottom:none}
 /* Key box */
 .key-box{background:var(--s3);border:1px solid var(--border2);padding:14px 16px;font-size:11px;word-break:break-all;line-height:1.7;color:var(--bright);position:relative;cursor:pointer;transition:border-color .15s}
 .key-box:hover{border-color:var(--yellow)}
-.key-box-label{font-size:8px;letter-spacing:.16em;color:var(--muted);margin-bottom:8px;text-transform:uppercase;display:flex;justify-content:space-between}
-.copy-hint{color:var(--dim);font-size:8px}
+.key-box-label{font-size:10px;letter-spacing:.14em;color:var(--muted);margin-bottom:8px;text-transform:uppercase;display:flex;justify-content:space-between}
+.copy-hint{color:var(--muted);font-size:9px;opacity:.7}
 .key-box:hover .copy-hint{color:var(--yellow)}
 .key-copied{position:absolute;top:8px;right:10px;font-size:9px;color:var(--yellow);opacity:0;transition:opacity .3s}
 .key-copied.show{opacity:1}
@@ -131,7 +131,7 @@ tr:last-child td{border-bottom:none}
 .log-box::-webkit-scrollbar-thumb{background:var(--border2)}
 .log-line{border-bottom:1px solid var(--dim);padding:2px 0}
 .log-line:last-child{border-bottom:none}
-.log-line .ts{color:var(--dim);margin-right:8px}
+.log-line .ts{color:var(--muted);opacity:.7;margin-right:8px}
 .log-line .msg{color:var(--text)}
 .log-line.ok .msg{color:var(--yellow)}
 .log-line.warn .msg{color:var(--amber)}
@@ -150,18 +150,18 @@ tr:last-child td{border-bottom:none}
 
 /* Shard pills */
 .shard-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
-.shard-pill{padding:2px 8px;font-size:8px;letter-spacing:.08em;border:1px solid var(--border2);color:var(--gold);background:rgba(201,168,0,.04)}
+.shard-pill{padding:2px 8px;font-size:9px;letter-spacing:.08em;border:1px solid var(--border2);color:var(--gold);background:rgba(201,168,0,.04)}
 
 /* Empty */
-.empty{text-align:center;padding:40px 20px;color:var(--dim)}
-.empty-icon{font-size:28px;margin-bottom:10px;opacity:.4}
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-icon{font-size:28px;margin-bottom:10px;opacity:.5}
 .empty p{font-size:11px;letter-spacing:.06em}
 
 /* Section label */
-.sec-label{font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--dim)}
+.sec-label{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--dim)}
 
-/* Chat */
-#panel-chat.active{display:flex!important;flex-direction:column;height:100%}
+/* Chat / Inference panels */
+#panel-chat.active,#panel-inference.active{display:flex!important;flex-direction:column;height:100%}
 .chat-wrap{display:flex;flex-direction:column;flex:1;min-height:400px}
 .chat-messages{flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:10px}
 .chat-messages::-webkit-scrollbar{width:4px}
@@ -180,7 +180,7 @@ tr:last-child td{border-bottom:none}
 .chat-send{background:none;border:1px solid var(--border2);color:var(--muted);padding:0 16px;cursor:pointer;font-family:var(--font);font-size:9px;letter-spacing:.1em;text-transform:uppercase;transition:all .15s;height:38px}
 .chat-send:hover{border-color:var(--yellow);color:var(--yellow)}
 .chat-send:disabled{opacity:.35;cursor:default}
-.chat-status-bar{font-size:9px;color:var(--muted);padding:4px 18px;background:var(--s1);border-top:1px solid var(--dim);letter-spacing:.06em;flex-shrink:0}
+.chat-status-bar{font-size:10px;color:var(--muted);padding:4px 18px;background:var(--s1);border-top:1px solid var(--dim);letter-spacing:.06em;flex-shrink:0}
 .chat-conn-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--red);margin-right:5px;vertical-align:middle}
 .chat-conn-dot.connected{background:var(--yellow)}
 
@@ -249,6 +249,7 @@ tr:last-child td{border-bottom:none}
   <div class="tab" onclick="showTab('rpc')"><span class="dot"></span>RPC KEY</div>
   <div class="tab" onclick="showTab('network')"><span class="dot"></span>NETWORK</div>
   <div class="tab" onclick="showTab('updates')"><span class="dot"></span>UPDATES</div>
+  <div class="tab" onclick="showTab('inference')" id="tab-inference"><span class="dot"></span>INFERENCE</div>
   <div class="tab" onclick="showTab('agent')"><span class="dot"></span>AGENT</div>
   <div class="tab" onclick="showTab('chat')" id="tab-chat"><span class="dot"></span>CHAT</div>
 </nav>
@@ -499,7 +500,7 @@ tr:last-child td{border-bottom:none}
             <th>Time</th><th>Version</th><th>Status</th><th>Detail</th>
           </tr></thead>
           <tbody id="upd-history">
-            <tr><td colspan="4" style="color:var(--dim);text-align:center">No update history</td></tr>
+            <tr><td colspan="4" style="color:var(--muted);text-align:center">No update history</td></tr>
           </tbody>
         </table>
       </div>
@@ -512,7 +513,30 @@ tr:last-child td{border-bottom:none}
         Backups are saved automatically before each update is applied.
       </p>
       <div id="upd-rollback-list">
-        <div style="color:var(--dim);font-size:11px">No backups available.</div>
+        <div style="color:var(--muted);font-size:11px">No backups available.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── INFERENCE ── -->
+  <section class="panel" id="panel-inference" style="padding:0">
+    <div style="background:var(--s2);border-bottom:1px solid var(--border2);padding:6px 16px;display:flex;align-items:center;gap:10px;font-size:10px;flex-shrink:0">
+      <div id="infer-dot" style="width:6px;height:6px;border-radius:50%;background:var(--dim);flex-shrink:0;transition:background .3s"></div>
+      <span id="infer-status-text" style="color:var(--muted);letter-spacing:.06em">Connecting to inference coordinator…</span>
+      <span style="margin-left:auto;color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.7">QWEN2.5-0.5B · CIRCUIT NETWORK</span>
+    </div>
+    <div class="chat-wrap">
+      <div class="chat-messages" id="infer-messages">
+        <div class="chat-msg system">Decentralized inference — free for co-located nodes. Powered by Qwen2.5-0.5B-Instruct running across the CIRCUIT worker mesh.</div>
+      </div>
+      <div class="chat-status-bar">
+        <span id="infer-info-label" style="color:var(--muted)">CIRCUIT Decentralized LLM</span>
+        <span style="float:right;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;font-size:9px" onclick="inferClear()" title="Clear conversation">CLEAR</span>
+      </div>
+      <div class="chat-bar">
+        <textarea class="chat-input" id="infer-input" placeholder="Chat with the decentralized inference network…" rows="1"
+          onkeydown="inferKeydown(event)"></textarea>
+        <button class="chat-send" id="infer-send" onclick="inferSend()" disabled>SEND</button>
       </div>
     </div>
   </section>
@@ -536,7 +560,7 @@ tr:last-child td{border-bottom:none}
       <div class="chat-status-bar">
         <span class="chat-conn-dot" id="chat-dot"></span>
         <span id="chat-status-text">connecting…</span>
-        <span style="float:right;color:var(--dim)" id="chat-model-label">—</span>
+        <span style="float:right;color:var(--muted)" id="chat-model-label">—</span>
       </div>
       <div class="chat-bar">
         <textarea class="chat-input" id="chat-input" placeholder="Ask about your node, the network, Solana…" rows="1"
@@ -651,11 +675,12 @@ function showTab(id) {
   document.querySelectorAll('.tab').forEach(t => {
     if (t.getAttribute('onclick')?.includes(id)) t.classList.add('active');
   });
-  if (id === 'network') renderNetwork();
-  if (id === 'updates') renderUpdates();
-  if (id === 'agent')   { loadAgentData(); }
-  if (id === 'chat')    renderChat();
-  if (id === 'rpc')     loadStakeConfig();
+  if (id === 'network')    renderNetwork();
+  if (id === 'updates')    renderUpdates();
+  if (id === 'agent')      { loadAgentData(); }
+  if (id === 'chat')       renderChat();
+  if (id === 'inference')  renderInference();
+  if (id === 'rpc')        loadStakeConfig();
 }
 
 function addLog(msg, type = '') {
@@ -811,7 +836,7 @@ function renderNetwork() {
     if (netData._unavailable) {
       // Canonical registry unreachable — show clear message
       const peerEl = $('net-peers');
-      if (peerEl) peerEl.innerHTML = '<div class="empty"><div class="empty-icon">◌</div><p>Registry temporarily unreachable</p><p style="margin-top:6px;font-size:10px;color:var(--dim)">Could not reach node.circuitllm.xyz — check your connection or try again shortly</p></div>';
+      if (peerEl) peerEl.innerHTML = '<div class="empty"><div class="empty-icon">◌</div><p>Registry temporarily unreachable</p><p style="margin-top:6px;font-size:10px;color:var(--muted)">Could not reach node.circuitllm.xyz — check your connection or try again shortly</p></div>';
       ['net-total','net-online','net-offline','net-agents'].forEach(id => txt(id, '—'));
     }
     return;
@@ -832,7 +857,7 @@ function renderNetwork() {
     const keys = Object.keys(cov);
     shardEl.innerHTML = keys.length ? keys.map(k =>
       `<div class="kv"><span class="kv-k">${k}</span><span class="kv-v ${cov[k] >= 3 ? 'green' : 'amber'}">${cov[k]} node${cov[k] !== 1 ? 's' : ''}</span></div>`
-    ).join('') : '<div class="kv"><span class="kv-k" style="color:var(--dim)">No shard data</span></div>';
+    ).join('') : '<div class="kv"><span class="kv-k" style="color:var(--muted)">No shard data</span></div>';
   }
 
   // Version distribution
@@ -842,7 +867,7 @@ function renderNetwork() {
     const vkeys = Object.keys(vers);
     verEl.innerHTML = vkeys.length ? vkeys.sort().map(v =>
       `<div class="kv"><span class="kv-k">v${_esc(v)}</span><span class="kv-v">${_esc(String(vers[v]))} node${vers[v] !== 1 ? 's' : ''}</span></div>`
-    ).join('') : '<div class="kv"><span class="kv-k" style="color:var(--dim)">No version data</span></div>';
+    ).join('') : '<div class="kv"><span class="kv-k" style="color:var(--muted)">No version data</span></div>';
   }
 
   // Peer grid
@@ -938,9 +963,9 @@ async function loadUpdateInfo() {
         <td>${fmtAgo(h.at)}</td>
         <td>${_esc('v' + (h.version ?? '?'))}</td>
         <td style="color:${h.status === 'applied' ? 'var(--green)' : h.status === 'failed' ? 'var(--red)' : 'var(--muted)'}">${_esc(h.status ?? '—')}</td>
-        <td style="color:var(--dim)">${_esc(h.method ?? h.reason ?? '')}</td>
+        <td style="color:var(--muted)">${_esc(h.method ?? h.reason ?? '')}</td>
       </tr>`).join('')
-      : '<tr><td colspan="4" style="color:var(--dim);text-align:center">No update history</td></tr>';
+      : '<tr><td colspan="4" style="color:var(--muted);text-align:center">No update history</td></tr>';
   }
 
   // Rollback list — use data-version + event listener, not onclick interpolation
@@ -955,7 +980,7 @@ async function loadUpdateInfo() {
         btn.addEventListener('click', () => doRollback(btn.dataset.v));
       });
     } else {
-      rollbackEl.innerHTML = '<div style="color:var(--dim);font-size:11px">No backups available.</div>';
+      rollbackEl.innerHTML = '<div style="color:var(--muted);font-size:11px">No backups available.</div>';
     }
   }
 }
@@ -1359,6 +1384,161 @@ async function checkStake(wallet) {
   } else {
     addLog('No stake found for wallet ' + shortAddr, 'warn');
   }
+}
+
+// ── Inference Chat ────────────────────────────────────────────────────────────
+let inferPending  = false;
+let inferMessages = [];  // { role, content }
+let inferLoaded   = false;
+
+async function renderInference() {
+  if (!inferLoaded) {
+    inferLoaded = true;
+    await _inferCheckStatus();
+  }
+}
+
+async function _inferCheckStatus() {
+  const dot = $('infer-dot');
+  try {
+    const r = await fetch('/inference/status');
+    const d = await r.json();
+    if (r.ok && d.available) {
+      if (dot) dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:var(--yellow);flex-shrink:0;box-shadow:0 0 6px var(--yellow);transition:background .3s';
+      txt('infer-status-text', `Ready · ${d.endpoint || 'localhost:19200'} · free`);
+      $('infer-send').disabled = false;
+    } else {
+      if (dot) dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:var(--amber);flex-shrink:0;transition:background .3s';
+      txt('infer-status-text', 'Coordinator not on localhost — inference requires CIRC payment');
+      _inferAppend('The inference coordinator is not running on this machine. To use free inference, run the circuit-decentralized-llm coordinator on the same host as this node client.', 'system');
+    }
+  } catch {
+    if (dot) dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:var(--red);flex-shrink:0;transition:background .3s';
+    txt('infer-status-text', 'Cannot reach inference proxy — is the node running?');
+  }
+}
+
+async function inferSend() {
+  if (inferPending) return;
+  const input = $('infer-input');
+  const text  = (input?.value ?? '').trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = '';
+  inferPending = true;
+  $('infer-send').disabled = true;
+
+  inferMessages.push({ role: 'user', content: text });
+  _inferAppend(text, 'user');
+
+  const msgEl = _inferAppend('', 'assistant', true);
+  let fullText = '';
+
+  try {
+    const resp = await fetch('/inference/chat', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        messages:    inferMessages.slice(-12),
+        max_tokens:  512,
+        temperature: 0.7,
+      }),
+    });
+
+    if (resp.status === 402) {
+      msgEl.remove();
+      inferMessages.pop();
+      _inferAppend('Inference requires CIRC payment — the coordinator is not available on localhost.', 'error');
+      return;
+    }
+    if (!resp.ok || !resp.body) {
+      const err = await resp.json().catch(() => ({}));
+      msgEl.remove();
+      inferMessages.pop();
+      _inferAppend('Error: ' + (err.error || err.message || resp.statusText), 'error');
+      return;
+    }
+
+    // Stream SSE
+    const reader  = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6).trim();
+        if (payload === '[DONE]') break;
+        try {
+          const parsed  = JSON.parse(payload);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) {
+            fullText += content;
+            const cursor = msgEl.querySelector('.chat-cursor');
+            if (cursor) cursor.insertAdjacentText('beforebegin', content);
+            else msgEl.textContent += content;
+            _inferScroll();
+          }
+        } catch {}
+      }
+    }
+
+    msgEl.querySelector('.chat-cursor')?.remove();
+    if (fullText) inferMessages.push({ role: 'assistant', content: fullText });
+    else { msgEl.textContent = '(no response)'; }
+
+  } catch (err) {
+    msgEl?.querySelector('.chat-cursor')?.remove();
+    if (!fullText) msgEl?.remove();
+    _inferAppend('Connection error: ' + err.message, 'error');
+    inferMessages.pop();
+  } finally {
+    inferPending = false;
+    $('infer-send').disabled = false;
+  }
+}
+
+function inferClear() {
+  inferMessages = [];
+  const box = $('infer-messages');
+  if (box) box.innerHTML = '<div class="chat-msg system">Conversation cleared.</div>';
+}
+
+function inferKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    inferSend();
+  }
+  const el = e.target;
+  el.style.height = '';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+function _inferAppend(text, role, streaming = false) {
+  const box = $('infer-messages');
+  if (!box) return null;
+  const el = document.createElement('div');
+  el.className = 'chat-msg ' + role;
+  el.textContent = text;
+  if (streaming) {
+    const cursor = document.createElement('span');
+    cursor.className = 'chat-cursor';
+    el.appendChild(cursor);
+  }
+  box.appendChild(el);
+  _inferScroll();
+  return el;
+}
+
+function _inferScroll() {
+  const box = $('infer-messages');
+  if (box) box.scrollTop = box.scrollHeight;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

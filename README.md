@@ -99,11 +99,12 @@ The node serves a dashboard at `http://localhost:19000/` with tabs:
 | Tab | Contents |
 |-----|----------|
 | **Overview** | Node identity, sync status, network at a glance, activity log |
-| **Keys** | Node ID (public key), usage examples |
+| **Keys** | Node ID (public key), CIRC staking status |
 | **Network** | Live node map, shard coverage, version distribution, peer list |
 | **Updates** | Current + latest version, update history, rollback controls |
+| **Inference** | Free LLM chat via the CIRCUIT decentralized inference network |
 | **Agent** | Agent stats (if `agentEnabled: true`) |
-| **Chat** | LLM chat interface (if agent connected + API key set) |
+| **Chat** | LLM chat with a paired circuit-agent (if agent connected) |
 
 ## Node Identity
 

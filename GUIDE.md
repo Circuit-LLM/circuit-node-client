@@ -120,7 +120,7 @@ node node-client.js deregister         # Remove from network and exit cleanly
 
 ## The Dashboard
 
-The dashboard runs at `http://localhost:19000`. It has six tabs.
+The dashboard runs at `http://localhost:19000`. It has seven tabs.
 
 ### Overview Tab
 
@@ -177,6 +177,16 @@ Auto-update is on by default. To disable it:
 ```json
 "updates": { "autoUpdate": false }
 ```
+
+---
+
+### Inference Tab
+
+A free LLM chat interface that speaks directly to the CIRCUIT decentralized inference network (`inference.circuitllm.xyz`). The chat is proxied through the node's local API at `/inference/chat`.
+
+**Free for co-located nodes** — if the inference coordinator is running on the same machine as your node client (the default VPS setup), requests hit `localhost:19200` and bypass the x402 payment gate. Remote node clients not co-located with a coordinator will see a payment-required message.
+
+The chat maintains conversation context across turns (up to 12 messages), supports streaming responses, and includes a **Clear** button to reset the session.
 
 ---
 
