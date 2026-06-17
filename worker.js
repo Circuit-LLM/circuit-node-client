@@ -53,10 +53,14 @@ try {
 const coordIdx = argv.indexOf('--coordinator');
 const portIdx  = argv.indexOf('--port');
 const keyIdx   = argv.indexOf('--key');
+const hostIdx  = argv.indexOf('--host');
 
 const workerPort      = portIdx  >= 0 ? parseInt(argv[portIdx  + 1] ?? '', 10) || 19210 : parseInt(cfg.port        ?? process.env.WORKER_PORT       ?? '19210', 10);
 const coordinatorHost = coordIdx >= 0 ? (argv[coordIdx + 1] ?? '')                      : (cfg.coordinator ?? process.env.COORDINATOR_HOST ?? 'localhost');
 const clusterKey      = keyIdx   >= 0 ? (argv[keyIdx   + 1] ?? '')                      : (cfg.clusterKey  ?? process.env.CLUSTER_KEY ?? '');
+// Public hostname/IP this worker should report when registering.
+// Required when the coordinator is remote and os.hostname() isn't reachable from it.
+const workerHost      = hostIdx  >= 0 ? (argv[hostIdx  + 1] ?? '')                      : (cfg.host        ?? process.env.WORKER_HOST ?? '');
 
 // ── Inline worker server (self-contained copy of pipeline/worker-server.js) ──
 // Including it inline avoids requiring the node-client to install this package.
@@ -161,7 +165,7 @@ let _server      = null;
 let _seqId       = 0;
 let _qwen2       = null; // Qwen2Worker instance, created when both shard+assignment are ready
 const stateFile  = path.join(__dirname, 'data', 'worker_state.json');
-const PEER_RANGE = 1000; // ms between state writes
+const PEER_RANGE = 15_000; // ms between periodic state writes (event-triggered writes still happen immediately)
 
 // Initialise Qwen2Worker once we have both the shard tensors and the layer assignment.
 // Derives actual layer range from tensor names in the shard (robust against re-assignment drift).
@@ -268,18 +272,31 @@ function _parseShard(buf) {
 // ── HTTP server for weight streaming ─────────────────────────────────────────
 // Listens at workerPort + 1000 for shard delivery from the coordinator.
 // This is separate from the TCP tensor pipeline server.
+//
+// When no clusterKey is configured, bind to 127.0.0.1 only — a remote coordinator
+// without a shared secret could otherwise inject arbitrary model weights.
+
+function _checkClusterKey(req, res) {
+  const provided = req.headers['x-cluster-key'] ?? '';
+  if (!clusterKey) return true; // no key = loopback-only bind, so TCP peer is already local
+  try {
+    const ka = Buffer.from(clusterKey, 'utf8');
+    const kb = Buffer.from(provided,   'utf8');
+    if (ka.length === kb.length && crypto.timingSafeEqual(ka, kb)) return true;
+  } catch {}
+  res.writeHead(403, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ ok: false, error: 'Invalid cluster key' }));
+  return false;
+}
+
 const httpWorkerPort = workerPort + 1000;
+// When no clusterKey is set, bind weight-delivery server to loopback only.
+// A clusterKey is required to accept weight delivery from a remote coordinator.
+const httpBindAddr   = clusterKey ? '0.0.0.0' : '127.0.0.1';
+
 const httpServer     = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/weights') {
-    // Require cluster key if one is configured
-    if (clusterKey) {
-      const provided = req.headers['x-cluster-key'] ?? '';
-      if (provided !== clusterKey) {
-        res.writeHead(403, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Invalid cluster key' }));
-        return;
-      }
-    }
+    if (!_checkClusterKey(req, res)) return;
     const chunks = [];
     req.on('data', c => chunks.push(c));
     req.on('end', () => {
@@ -331,14 +348,7 @@ const httpServer     = http.createServer((req, res) => {
   }
 
   if (req.method === 'GET' && req.url === '/status') {
-    if (clusterKey) {
-      const provided = req.headers['x-cluster-key'] ?? '';
-      if (provided !== clusterKey) {
-        res.writeHead(403, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Invalid cluster key' }));
-        return;
-      }
-    }
+    if (!_checkClusterKey(req, res)) return;
     // Compute actual layer range from shard tensor names
     const blkLayers = (_shardTensors ?? [])
       .map(t => { const m = (t.name ?? '').match(/^blk\.(\d+)\./); return m ? parseInt(m[1]) : -1; })
@@ -364,8 +374,11 @@ const httpServer     = http.createServer((req, res) => {
   res.end('Not found');
 });
 
-httpServer.listen(httpWorkerPort, '0.0.0.0', () => {
-  log('INFO', 'worker: HTTP server ready', { port: httpWorkerPort });
+httpServer.listen(httpWorkerPort, httpBindAddr, () => {
+  log('INFO', 'worker: HTTP server ready', { port: httpWorkerPort, bind: httpBindAddr });
+  if (!clusterKey) {
+    log('WARN', 'worker: no clusterKey configured — weight delivery bound to loopback only; set clusterKey in config/worker.json to accept from remote coordinator');
+  }
 });
 
 // ── Start TCP listener ─────────────────────────────────────────────────────────
@@ -506,7 +519,7 @@ try {
 function _registerWithCoordinator() {
   const body = JSON.stringify({
     nodeId:        _identity.nodeId,
-    host:          coordinatorHost === 'localhost' ? '127.0.0.1' : os.hostname(),
+    host:          workerHost || (coordinatorHost === 'localhost' ? '127.0.0.1' : os.hostname()),
     workerPort,
     walletAddress: WALLET_ADDRESS,
     ramMb:         Math.floor(os.freemem() / (1024 * 1024)),
@@ -550,19 +563,12 @@ function _heartbeatCoordinator() {
 
 // ── Announce to bootstrap (secondary discovery) ───────────────────────────────
 function _announceBootstrap() {
-  const host = cfg.host ?? process.env.NODE_HOST ?? null;
-  if (!host) {
-    // Bootstrap requires host — skip until nodeAddress is configured
-    return;
-  }
   const body = JSON.stringify({
     nodeId:       _identity.nodeId,
     version:      '0.1.0',
     region:       cfg.region ?? 'us-east',
     capabilities: ['llm-worker'],
     workerPort,
-    host,
-    port:         parseInt(process.env.NODE_API_PORT ?? cfg.apiPort ?? '19000', 10),
     ramMb:        Math.floor(os.freemem() / (1024 * 1024)),
     timestamp:    Date.now(),
   });

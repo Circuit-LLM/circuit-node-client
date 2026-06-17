@@ -70,7 +70,9 @@
     "coordinatorUrl": "https://inference.circuitllm.xyz",
     "_coordNote":     "URL of the circuit-decentralized-llm coordinator.",
     "clusterKey":     "",
-    "_keyNote":       "Shared secret for coordinator authentication. Leave blank for open clusters. Must match coordinator clusterKey.",
+    "_keyNote":       "Shared secret for coordinator authentication. Required for remote coordinators. Must match coordinator clusterKey.",
+    "host":           "",
+    "_hostNote":      "Public IP or hostname the coordinator can reach to open the TCP tensor pipeline. Required if your machine is behind NAT. Example: '203.0.113.42' or 'mynode.example.com'. Leave blank if running on the same machine as the coordinator.",
     "walletAddress":  null,
     "_walletNote":    "Your Solana wallet address for CIRC payment attribution. If set, you earn a share of inference fees proportional to layers you run."
   }

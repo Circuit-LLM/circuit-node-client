@@ -249,6 +249,7 @@ tr:last-child td{border-bottom:none}
   <div class="tab" onclick="showTab('rpc')"><span class="dot"></span>RPC KEY</div>
   <div class="tab" onclick="showTab('network')"><span class="dot"></span>NETWORK</div>
   <div class="tab" onclick="showTab('updates')"><span class="dot"></span>UPDATES</div>
+  <div class="tab" onclick="showTab('staking')" id="tab-staking"><span class="dot"></span>STAKING</div>
   <div class="tab" onclick="showTab('inference')" id="tab-inference"><span class="dot"></span>INFERENCE</div>
   <div class="tab" onclick="showTab('agent')"><span class="dot"></span>AGENT</div>
   <div class="tab" onclick="showTab('chat')" id="tab-chat"><span class="dot"></span>CHAT</div>
@@ -352,66 +353,162 @@ tr:last-child td{border-bottom:none}
       </div>
     </div>
 
-    <!-- ── CIRC Staking Access ── -->
-    <div class="card" id="stake-card">
-      <div class="card-t">CIRC Staking Access <span class="card-t-r" id="stake-ts">—</span></div>
-
-      <!-- Pool not configured — show wallet connect anyway so user can see/test the interface -->
-      <div id="stake-not-configured" style="display:none">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <span style="font-size:9px;letter-spacing:.12em;color:var(--amber);background:rgba(255,149,0,.08);border:1px solid rgba(255,149,0,.2);padding:2px 8px">POOL PENDING</span>
-          <span style="font-size:10px;color:var(--muted)">Staking pool not yet configured in client.json</span>
-        </div>
+    <div class="card">
+      <div class="card-t">CIRC Staking Access</div>
+      <p style="font-size:11px;color:var(--muted);line-height:1.8;margin-bottom:12px">
+        Stake CIRC tokens to unlock RPC access for external callers.
+        View your full stake status in the <a href="#" onclick="showTab('staking');return false" style="color:var(--gold);text-decoration:none">Staking tab ↗</a>
+      </p>
+      <div class="kv"><span class="kv-k">Min. Required</span><span class="kv-v amber" id="rpc-stake-min">—</span></div>
+      <div class="kv"><span class="kv-k">Your Status</span><span class="kv-v" id="rpc-stake-status">—</span></div>
+      <div class="kv"><span class="kv-k">Staking Pool</span>
+        <span class="kv-v"><a href="https://stakepoint.app" target="_blank" style="color:var(--gold);text-decoration:none">stakepoint.app ↗</a></span>
       </div>
+    </div>
 
-      <!-- Wallet not connected -->
-      <div id="stake-connect-prompt">
-        <p style="font-size:11px;color:var(--muted);line-height:1.8;margin-bottom:12px">
-          Stake CIRC tokens to unlock RPC access for external callers.
-          Connect your wallet to verify your on-chain stake position.
-        </p>
-        <div class="kv"><span class="kv-k">Min. Required</span><span class="kv-v amber" id="stake-min-display">—</span></div>
-        <div class="kv"><span class="kv-k">Staking Pool</span>
-          <span class="kv-v"><a id="stake-pool-link" href="https://stakepoint.app" target="_blank"
-            style="color:var(--gold);text-decoration:none">stakepoint.app ↗</a></span>
-        </div>
-        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+  </section>
+
+  <!-- ── STAKING ── -->
+  <section class="panel" id="panel-staking">
+
+    <!-- Status hero bar -->
+    <div style="background:var(--s2);border:1px solid var(--border);padding:16px 18px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div style="font-size:9px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Access Status</div>
+        <div class="stake-access-status checking" id="stake-access-label">CHECKING…</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:9px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Wallet</div>
+        <div id="stake-wallet-display" style="font-size:11px;color:var(--muted)">Not connected</div>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="stake-progress mb">
+      <div class="stake-progress-fill" id="stake-progress-fill" style="width:0%"></div>
+    </div>
+
+    <!-- Not configured banner -->
+    <div id="stake-not-configured" style="display:none;margin-bottom:10px">
+      <div style="background:rgba(255,149,0,.04);border:1px solid rgba(255,149,0,.18);padding:10px 14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:9px;letter-spacing:.12em;color:var(--amber);background:rgba(255,149,0,.08);border:1px solid rgba(255,149,0,.2);padding:2px 8px;white-space:nowrap">POOL PENDING</span>
+        <span style="font-size:10px;color:var(--muted)">Staking pool not yet configured in <code style="color:var(--green)">config/client.json</code>. Add <code style="color:var(--green)">access.stakingPool</code> to enable on-chain stake verification.</span>
+      </div>
+    </div>
+
+    <div class="g2 mb">
+      <!-- Stake position -->
+      <div class="card">
+        <div class="card-t">Your Stake Position <span class="card-t-r" id="stake-ts">—</span></div>
+
+        <div id="stake-connect-prompt">
+          <p style="font-size:11px;color:var(--muted);line-height:1.8;margin-bottom:14px">
+            Connect your Solana wallet to verify your on-chain CIRC stake and unlock RPC access for external callers.
+          </p>
           <button class="btn primary" onclick="connectStakeWallet()">◎ CONNECT WALLET</button>
-          <a id="stake-go-link" href="https://stakepoint.app" target="_blank" class="btn">STAKE CIRC ↗</a>
         </div>
-      </div>
 
-      <!-- Wallet connected — showing stake status -->
-      <div id="stake-status-panel" style="display:none">
-        <div class="stake-access-bar">
-          <div>
-            <div style="font-size:8px;letter-spacing:.16em;color:var(--muted);margin-bottom:5px;text-transform:uppercase">Access Status</div>
-            <div class="stake-access-status checking" id="stake-access-label">CHECKING…</div>
+        <div id="stake-status-panel" style="display:none">
+          <div class="kv">
+            <span class="kv-k">Staked CIRC</span>
+            <span class="kv-v" id="stake-amount-display">—</span>
           </div>
-          <div style="text-align:right">
-            <div style="font-size:8px;letter-spacing:.12em;color:var(--muted);margin-bottom:5px;text-transform:uppercase">Wallet</div>
+          <div class="kv">
+            <span class="kv-k">Required</span>
+            <span class="kv-v amber" id="stake-req-display">—</span>
+          </div>
+          <div class="kv">
+            <span class="kv-k">Shortfall</span>
+            <span class="kv-v" id="stake-shortfall-display">—</span>
+          </div>
+          <div class="kv">
+            <span class="kv-k">Lock Until</span>
+            <span class="kv-v" id="stake-lock-display">—</span>
+          </div>
+          <div class="kv">
+            <span class="kv-k">Position Address</span>
+            <span class="kv-v" id="stake-position-display" style="font-size:9px">—</span>
+          </div>
+          <div class="kv" style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px">
+            <span class="kv-k">Wallet</span>
             <div class="stake-wallet-tag" onclick="disconnectStakeWallet()" title="Click to disconnect">
               <span id="stake-wallet-short">—</span> ✕
             </div>
           </div>
+          <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="refreshStake()">REFRESH</button>
+            <button class="btn" onclick="disconnectStakeWallet()">DISCONNECT</button>
+          </div>
         </div>
-        <div class="stake-progress mb">
-          <div class="stake-progress-fill" id="stake-progress-fill" style="width:0%"></div>
-        </div>
-        <div class="kv"><span class="kv-k">Staked CIRC</span><span class="kv-v" id="stake-amount-display">—</span></div>
-        <div class="kv"><span class="kv-k">Required</span><span class="kv-v" id="stake-req-display">—</span></div>
-        <div class="kv"><span class="kv-k">Lock Until</span><span class="kv-v" id="stake-lock-display">—</span></div>
-        <div class="kv"><span class="kv-k">Position</span><span class="kv-v" id="stake-position-display" style="font-size:9px">—</span></div>
-        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <a id="stake-action-link" href="https://stakepoint.app" target="_blank" class="btn primary">MANAGE STAKE ↗</a>
-          <button class="btn" onclick="refreshStake()">REFRESH</button>
-          <button class="btn" onclick="disconnectStakeWallet()" style="margin-left:auto">DISCONNECT</button>
+
+        <div id="stake-loading" style="display:none;padding:10px 0;font-size:11px;color:var(--muted);letter-spacing:.06em">
+          ◌ Checking on-chain stake…
         </div>
       </div>
 
-      <!-- Loading state -->
-      <div id="stake-loading" style="display:none;padding:10px 0;font-size:11px;color:var(--muted);letter-spacing:.06em">
-        ◌ Checking on-chain stake…
+      <!-- Pool & access info -->
+      <div class="card">
+        <div class="card-t">Pool Configuration</div>
+        <div class="kv"><span class="kv-k">Min. Required</span><span class="kv-v amber" id="stake-min-display">—</span></div>
+        <div class="kv"><span class="kv-k">Pool</span>
+          <span class="kv-v"><a id="stake-pool-link" href="https://stakepoint.app" target="_blank"
+            style="color:var(--gold);text-decoration:none">stakepoint.app ↗</a></span>
+        </div>
+        <div class="kv"><span class="kv-k">Pool Address</span>
+          <span class="kv-v" id="stake-pool-address" style="font-size:9px;color:var(--muted)">not configured</span>
+        </div>
+        <div class="kv"><span class="kv-k">Token</span>
+          <span class="kv-v" style="font-size:9px">CIRC · 8fQg…pump</span>
+        </div>
+        <div class="kv"><span class="kv-k">Config key</span>
+          <span class="kv-v" style="font-size:9px;color:var(--muted)">access.stakingPool</span>
+        </div>
+        <div style="margin-top:14px">
+          <a id="stake-go-link" href="https://stakepoint.app" target="_blank" class="btn primary">STAKE CIRC ↗</a>
+          <a id="stake-action-link" href="https://stakepoint.app" target="_blank" class="btn" style="margin-left:8px;display:none">MANAGE STAKE ↗</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- What staking unlocks -->
+    <div class="card mb">
+      <div class="card-t">What Staking Unlocks</div>
+      <div class="g2">
+        <div>
+          <div class="kv"><span class="kv-k">External RPC Access</span><span class="kv-v green">Unlocked by stake</span></div>
+          <div class="kv"><span class="kv-k">Local API Access</span><span class="kv-v green">Always free</span></div>
+          <div class="kv"><span class="kv-k">Dashboard</span><span class="kv-v green">Always free</span></div>
+          <div class="kv"><span class="kv-k">Decentralized Inference</span><span class="kv-v green">Free on localhost</span></div>
+        </div>
+        <div>
+          <div class="kv"><span class="kv-k">External inference callers</span><span class="kv-v amber">CIRC payment (x402)</span></div>
+          <div class="kv"><span class="kv-k">Stake-gated RPC</span><span class="kv-v amber">100,000 CIRC min</span></div>
+          <div class="kv"><span class="kv-k">Lock period</span><span class="kv-v">Determined by pool</span></div>
+          <div class="kv"><span class="kv-k">Earn CIRC</span><span class="kv-v green">Via inference compute</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- How to stake -->
+    <div class="card">
+      <div class="card-t">How to Stake</div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:11px;line-height:1.7">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="width:20px;height:20px;border:1px solid var(--border2);color:var(--gold);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</span>
+          <span style="color:var(--muted)">Get CIRC tokens on <a href="https://stakepoint.app" target="_blank" style="color:var(--gold);text-decoration:none">stakepoint.app</a> or any Solana DEX. Mint: <code style="color:var(--green)">8fQgfsRnRkKSeNUhevT7wp8mhNvMSJdLn1fJi4oVpump</code></span>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="width:20px;height:20px;border:1px solid var(--border2);color:var(--gold);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</span>
+          <span style="color:var(--muted)">Go to <a href="https://stakepoint.app" target="_blank" style="color:var(--gold);text-decoration:none">stakepoint.app</a> and stake into the Circuit pool. Copy the pool address.</span>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="width:20px;height:20px;border:1px solid var(--border2);color:var(--gold);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</span>
+          <span style="color:var(--muted)">Add the pool address to your node config: <code style="color:var(--green)">access.stakingPool</code> in <code style="color:var(--green)">config/client.json</code>. Restart your node.</span>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="width:20px;height:20px;border:1px solid var(--border2);color:var(--gold);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">4</span>
+          <span style="color:var(--muted)">Connect your wallet above and verify your stake. External callers with the correct API key can now access your node's RPC endpoints.</span>
+        </div>
       </div>
     </div>
 
@@ -680,7 +777,8 @@ function showTab(id) {
   if (id === 'agent')      { loadAgentData(); }
   if (id === 'chat')       renderChat();
   if (id === 'inference')  renderInference();
-  if (id === 'rpc')        loadStakeConfig();
+  if (id === 'staking')    loadStakeConfig();
+  if (id === 'rpc')        _refreshRpcStakeSummary();
 }
 
 function addLog(msg, type = '') {
@@ -1267,14 +1365,7 @@ async function loadStakeConfig() {
 
   _stakeConfig = data;
 
-  // Show "pool pending" banner if not configured, but still show the wallet UI
   $('stake-not-configured').style.display = data.configured ? 'none' : 'block';
-
-  // Always show the connect prompt / wallet UI regardless of pool config
-  // so users can connect their wallet and see the interface
-  if (!_stakeWallet) {
-    $('stake-connect-prompt').style.display = 'block';
-  }
 
   txt('stake-min-display', (data.minRequired ?? 0).toLocaleString() + ' CIRC', 'amber');
 
@@ -1283,8 +1374,36 @@ async function loadStakeConfig() {
     const el = $(id); if (el) el.href = poolUrl;
   });
 
+  // Pool address display
+  const poolAddrEl = $('stake-pool-address');
+  if (poolAddrEl) {
+    const addr = data.poolAddress ?? null;
+    poolAddrEl.textContent = addr ? (addr.slice(0,8) + '…' + addr.slice(-6)) : 'not configured';
+  }
+
   if (_stakeWallet) {
     await checkStake(_stakeWallet);
+  } else {
+    $('stake-connect-prompt').style.display = 'block';
+    $('stake-status-panel').style.display   = 'none';
+    $('stake-access-label').textContent = 'NOT CONNECTED';
+    $('stake-access-label').className   = 'stake-access-status locked';
+    txt('stake-wallet-display', 'Not connected');
+  }
+}
+
+function _refreshRpcStakeSummary() {
+  // Populate the minimal stake summary on the RPC tab
+  const minEl = $('rpc-stake-min');
+  const stEl  = $('rpc-stake-status');
+  if (minEl && _stakeConfig) {
+    minEl.textContent = (_stakeConfig.minRequired ?? 0).toLocaleString() + ' CIRC';
+    minEl.className = 'kv-v amber';
+  }
+  if (stEl) {
+    const label = $('stake-access-label');
+    stEl.textContent = label?.textContent ?? '—';
+    stEl.className = 'kv-v ' + (_stakeWallet ? (label?.textContent?.includes('UNLOCKED') ? 'green' : 'red') : '');
   }
 }
 
@@ -1299,6 +1418,7 @@ async function connectStakeWallet() {
     _stakeWallet = (resp?.publicKey ?? provider.publicKey)?.toString();
     if (!_stakeWallet) throw new Error('No public key returned');
     localStorage.setItem('stake_wallet', _stakeWallet);
+    txt('stake-wallet-display', _stakeWallet.slice(0,4) + '…' + _stakeWallet.slice(-4));
     addLog('Wallet connected: ' + _stakeWallet.slice(0,8) + '…', 'ok');
     await checkStake(_stakeWallet);
   } catch (err) {
@@ -1315,6 +1435,10 @@ function disconnectStakeWallet() {
   $('stake-status-panel').style.display  = 'none';
   $('stake-connect-prompt').style.display = 'block';
   $('stake-ts').textContent = '—';
+  txt('stake-access-label', 'NOT CONNECTED', 'checking');
+  txt('stake-wallet-display', 'Not connected');
+  const manageEl = $('stake-action-link');
+  if (manageEl) manageEl.style.display = 'none';
   addLog('Wallet disconnected', '');
 }
 
@@ -1334,22 +1458,31 @@ async function checkStake(wallet) {
 
   if (!data || !data.configured) {
     $('stake-connect-prompt').style.display = 'block';
+    txt('stake-access-label', 'POOL NOT CONFIGURED', 'checking');
+    txt('stake-wallet-display', wallet.slice(0,4) + '…' + wallet.slice(-4));
     return;
   }
 
   $('stake-status-panel').style.display = 'block';
   txt('stake-ts', new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}));
 
-  // Wallet tag
   const shortAddr = wallet.slice(0, 4) + '…' + wallet.slice(-4);
   txt('stake-wallet-short', shortAddr);
+  txt('stake-wallet-display', shortAddr);
 
-  // Amounts
-  const staked  = data.stakedAmount ?? 0;
-  const minReq  = data.minRequired  ?? 0;
+  const staked = data.stakedAmount ?? 0;
+  const minReq = data.minRequired  ?? 0;
   txt('stake-req-display',    minReq.toLocaleString() + ' CIRC');
   txt('stake-amount-display', staked.toLocaleString(undefined, {maximumFractionDigits: 2}) + ' CIRC',
     staked >= minReq ? 'green' : 'red');
+
+  // Shortfall
+  const shortfall = Math.max(0, minReq - staked);
+  txt('stake-shortfall-display',
+    shortfall > 0
+      ? shortfall.toLocaleString(undefined, {maximumFractionDigits: 0}) + ' CIRC needed'
+      : '— (requirement met)',
+    shortfall > 0 ? 'amber' : 'green');
 
   // Progress bar
   const pct = minReq > 0 ? Math.min(100, (staked / minReq) * 100) : (staked > 0 ? 100 : 0);
@@ -1366,11 +1499,14 @@ async function checkStake(wallet) {
     txt('stake-lock-display', staked > 0 ? 'No lock period' : '—');
   }
 
-  // Position address
   txt('stake-position-display',
     data.positionAddress ? data.positionAddress.slice(0,12) + '…' + data.positionAddress.slice(-6) : '—');
 
-  // Access status
+  // Show manage stake button if wallet connected
+  const manageEl = $('stake-action-link');
+  if (manageEl) manageEl.style.display = 'inline-block';
+
+  // Access status hero
   const label = $('stake-access-label');
   if (label) {
     label.className = 'stake-access-status ' + (data.eligible ? 'unlocked' : 'locked');
@@ -1547,14 +1683,13 @@ async function init() {
   await loadStatus();
   await loadIdentity();
   await loadNetwork();
-  await loadStakeConfig();
+  await loadStakeConfig();  // pre-load so staking tab is instant
 
-  // Poll every 15s; refresh agent data if tab is active
   setInterval(async () => {
     await loadStatus();
     await loadNetwork();
-    if ($('panel-agent')?.classList.contains('active')) await loadAgentData();
-    if ($('panel-rpc')?.classList.contains('active') && _stakeWallet) await checkStake(_stakeWallet);
+    if ($('panel-agent')?.classList.contains('active'))   await loadAgentData();
+    if ($('panel-staking')?.classList.contains('active') && _stakeWallet) await checkStake(_stakeWallet);
   }, 15_000);
 }
 
