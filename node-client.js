@@ -175,7 +175,7 @@ async function runNode() {
 
   // 7. Start LLM worker sidecar if enabled
   if (config.llmWorker?.enabled) {
-    llmWorker.start(config.llmWorker);
+    llmWorker.start({ ...config.llmWorker, nodeApiPort: config.node?.apiPort ?? 19000 });
     console.log(`[node-client] ✓ LLM worker starting on port ${config.llmWorker.port ?? 19110}`);
   }
 

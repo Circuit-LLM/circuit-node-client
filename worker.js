@@ -550,12 +550,19 @@ function _heartbeatCoordinator() {
 
 // ── Announce to bootstrap (secondary discovery) ───────────────────────────────
 function _announceBootstrap() {
+  const host = cfg.host ?? process.env.NODE_HOST ?? null;
+  if (!host) {
+    // Bootstrap requires host — skip until nodeAddress is configured
+    return;
+  }
   const body = JSON.stringify({
     nodeId:       _identity.nodeId,
     version:      '0.1.0',
     region:       cfg.region ?? 'us-east',
     capabilities: ['llm-worker'],
     workerPort,
+    host,
+    port:         parseInt(process.env.NODE_API_PORT ?? cfg.apiPort ?? '19000', 10),
     ramMb:        Math.floor(os.freemem() / (1024 * 1024)),
     timestamp:    Date.now(),
   });
