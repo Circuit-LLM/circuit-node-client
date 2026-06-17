@@ -288,6 +288,29 @@ tr:last-child td{border-bottom:none}
       </div>
     </div>
 
+    <div class="g2 mb">
+      <div class="card">
+        <div class="card-t">LLM Worker</div>
+        <div class="kv"><span class="kv-k">Status</span><span class="kv-v" id="ov-llm-status">—</span></div>
+        <div class="kv"><span class="kv-k">Port</span><span class="kv-v" id="ov-llm-port">—</span></div>
+        <div class="kv"><span class="kv-k">Layers</span><span class="kv-v" id="ov-llm-layers">—</span></div>
+        <div class="kv"><span class="kv-k">RAM</span><span class="kv-v" id="ov-llm-ram">—</span></div>
+        <div class="kv"><span class="kv-k">Worker Uptime</span><span class="kv-v" id="ov-llm-coord">—</span></div>
+        <div class="kv"><span class="kv-k">Restarts</span><span class="kv-v" id="ov-llm-restarts">—</span></div>
+      </div>
+      <div class="card">
+        <div class="card-t">Stake &amp; Access</div>
+        <div class="kv"><span class="kv-k">Wallet</span><span class="kv-v" id="ov-stake-wallet">Not connected</span></div>
+        <div class="kv"><span class="kv-k">Access Status</span><span class="kv-v" id="ov-stake-status">—</span></div>
+        <div class="kv"><span class="kv-k">Staked CIRC</span><span class="kv-v" id="ov-stake-amount">—</span></div>
+        <div class="kv"><span class="kv-k">Required</span><span class="kv-v" id="ov-stake-req">—</span></div>
+        <div class="kv"><span class="kv-k">External RPC</span><span class="kv-v" id="ov-stake-rpc">—</span></div>
+        <div style="margin-top:10px">
+          <button class="btn" onclick="showTab('staking')" style="font-size:8px">VIEW STAKING ↗</button>
+        </div>
+      </div>
+    </div>
+
     <div class="card mb">
       <div class="card-t">Network At a Glance <span class="card-t-r" id="ov-map-ts">—</span></div>
       <div class="chips chips-4" id="ov-chips">
@@ -333,8 +356,8 @@ tr:last-child td{border-bottom:none}
         <div class="card-t">Local API Usage</div>
         <div class="kv"><span class="kv-k">Base URL</span><span class="kv-v" id="rpc-base-url">—</span></div>
         <div class="kv"><span class="kv-k">Auth Header</span><span class="kv-v">X-Api-Key: &lt;key&gt;</span></div>
-        <div class="kv"><span class="kv-k">Local access</span><span class="kv-v green">Free (no key needed)</span></div>
-        <div class="kv"><span class="kv-k">External access</span><span class="kv-v">Key required</span></div>
+        <div class="kv"><span class="kv-k">Local access</span><span class="kv-v green">No API key required</span></div>
+        <div class="kv"><span class="kv-k">External access</span><span class="kv-v amber">API key + CIRC stake</span></div>
         <div class="kv"><span class="kv-k">Endpoints</span><span class="kv-v">All circuit-node API routes</span></div>
       </div>
       <div class="card">
@@ -476,9 +499,9 @@ tr:last-child td{border-bottom:none}
       <div class="g2">
         <div>
           <div class="kv"><span class="kv-k">External RPC Access</span><span class="kv-v green">Unlocked by stake</span></div>
-          <div class="kv"><span class="kv-k">Local API Access</span><span class="kv-v green">Always free</span></div>
-          <div class="kv"><span class="kv-k">Dashboard</span><span class="kv-v green">Always free</span></div>
-          <div class="kv"><span class="kv-k">Decentralized Inference</span><span class="kv-v green">Free on localhost</span></div>
+          <div class="kv"><span class="kv-k">Local API Access</span><span class="kv-v green">No key required</span></div>
+          <div class="kv"><span class="kv-k">Dashboard</span><span class="kv-v green">No auth required</span></div>
+          <div class="kv"><span class="kv-k">Decentralized Inference</span><span class="kv-v">Available on localhost</span></div>
         </div>
         <div>
           <div class="kv"><span class="kv-k">External inference callers</span><span class="kv-v amber">CIRC payment (x402)</span></div>
@@ -624,7 +647,7 @@ tr:last-child td{border-bottom:none}
     </div>
     <div class="chat-wrap">
       <div class="chat-messages" id="infer-messages">
-        <div class="chat-msg system">Decentralized inference — free for co-located nodes. Powered by Qwen2.5-0.5B-Instruct running across the CIRCUIT worker mesh.</div>
+        <div class="chat-msg system">Decentralized inference via the CIRCUIT worker mesh. Powered by Qwen2.5-0.5B-Instruct.</div>
       </div>
       <div class="chat-status-bar">
         <span id="infer-info-label" style="color:var(--muted)">CIRCUIT Decentralized LLM</span>
@@ -694,7 +717,7 @@ tr:last-child td{border-bottom:none}
         <div class="card-t">Agent Info</div>
         <div class="kv"><span class="kv-k">Agent ID</span><span class="kv-v" id="ag-id">—</span></div>
         <div class="kv"><span class="kv-k">Wallet</span><span class="kv-v" id="ag-wallet">—</span></div>
-        <div class="kv"><span class="kv-k">API calls today</span><span class="kv-v">Free (local node)</span></div>
+        <div class="kv"><span class="kv-k">Data API</span><span class="kv-v amber">x402 (CIRC)</span></div>
       </div>
 
       <div id="ag-positions-card" class="card mb" style="display:none">
@@ -859,6 +882,52 @@ async function loadStatus() {
   txt('ov-sync-slot', sync.slotHeight?.toLocaleString() ?? '—');
 
   addLog('Status refreshed — node ' + (data.status === 'ok' ? 'online' : 'error'), data.status === 'ok' ? 'ok' : 'err');
+}
+
+// ── LLM worker overview ───────────────────────────────────────────────────────
+async function loadLlmStatus() {
+  const data = await api('/llm/status');
+  if (!data) return;
+
+  const enabled = data.enabled ?? false;
+  const running = data.running ?? false;
+  const asgn    = data.assignment ?? null;
+
+  if (!enabled) {
+    txt('ov-llm-status', 'DISABLED');
+    ['ov-llm-port','ov-llm-layers','ov-llm-ram','ov-llm-coord','ov-llm-restarts'].forEach(id => txt(id, '—'));
+    return;
+  }
+  const hasLayers = asgn && asgn.layerStart != null;
+  txt('ov-llm-status',
+    !running ? 'STOPPED' : hasLayers ? 'ACTIVE' : 'CONNECTING',
+    !running ? 'red' : hasLayers ? 'green' : 'amber');
+  txt('ov-llm-port',     data.port ? ':' + data.port : '—');
+  txt('ov-llm-layers',   hasLayers ? 'L'+asgn.layerStart+'–'+asgn.layerEnd+' / '+asgn.totalLayers : '—', hasLayers ? 'green' : '');
+  txt('ov-llm-ram',      data.ramMb ? (Math.round(data.ramMb/1024*10)/10) + ' GB' : '—');
+  txt('ov-llm-coord',    data.uptimeSec != null ? fmtUptime(data.uptimeSec) + ' uptime' : '—');
+  txt('ov-llm-restarts', data.restarts != null ? String(data.restarts) : '0', (data.restarts ?? 0) > 3 ? 'amber' : '');
+}
+
+// ── Stake overview summary ────────────────────────────────────────────────────
+function refreshOvStake() {
+  if (!_stakeWallet) {
+    txt('ov-stake-wallet', 'Not connected');
+    txt('ov-stake-status', '—');
+    txt('ov-stake-amount', '—');
+    txt('ov-stake-req',    _stakeConfig ? _stakeConfig.minRequired?.toLocaleString() + ' CIRC' : '—', 'amber');
+    txt('ov-stake-rpc',    'Locked', 'red');
+    return;
+  }
+  const label   = $('stake-access-label');
+  const eligible = label?.textContent?.includes('UNLOCKED') ?? false;
+  const amtEl   = $('stake-amount-display');
+  const reqEl   = $('stake-req-display');
+  txt('ov-stake-wallet', _stakeWallet.slice(0,4) + '…' + _stakeWallet.slice(-4));
+  txt('ov-stake-status', eligible ? '● UNLOCKED' : '○ STAKE REQUIRED', eligible ? 'green' : 'red');
+  txt('ov-stake-amount', amtEl?.textContent ?? '—', eligible ? 'green' : 'red');
+  txt('ov-stake-req',    reqEl?.textContent ?? '—', 'amber');
+  txt('ov-stake-rpc',    eligible ? 'OPEN' : 'LOCKED', eligible ? 'green' : 'red');
 }
 
 // ── Load node identity ────────────────────────────────────────────────────────
@@ -1407,6 +1476,8 @@ function _refreshRpcStakeSummary() {
   }
 }
 
+let _walletProvider = null;
+
 async function connectStakeWallet() {
   const provider = window.phantom?.solana || window.solana || window.solflare;
   if (!provider) {
@@ -1420,6 +1491,7 @@ async function connectStakeWallet() {
     localStorage.setItem('stake_wallet', _stakeWallet);
     txt('stake-wallet-display', _stakeWallet.slice(0,4) + '…' + _stakeWallet.slice(-4));
     addLog('Wallet connected: ' + _stakeWallet.slice(0,8) + '…', 'ok');
+    _attachWalletEvents(provider);
     await checkStake(_stakeWallet);
   } catch (err) {
     if (err.code !== 4001) {  // 4001 = user rejected
@@ -1427,6 +1499,35 @@ async function connectStakeWallet() {
       alert('Wallet connection failed: ' + err.message);
     }
   }
+}
+
+function _attachWalletEvents(provider) {
+  // Remove from old provider first
+  if (_walletProvider && _walletProvider !== provider) {
+    _walletProvider.off?.('accountChanged', _onAccountChanged);
+    _walletProvider.off?.('disconnect',     _onWalletDisconnect);
+  }
+  _walletProvider = provider;
+  provider.on?.('accountChanged', _onAccountChanged);
+  provider.on?.('disconnect',     _onWalletDisconnect);
+}
+
+async function _onAccountChanged(pubkey) {
+  const newAddr = pubkey?.toString?.() ?? null;
+  if (!newAddr) {
+    disconnectStakeWallet();
+    return;
+  }
+  if (newAddr === _stakeWallet) return;
+  _stakeWallet = newAddr;
+  localStorage.setItem('stake_wallet', _stakeWallet);
+  addLog('Wallet switched to ' + _stakeWallet.slice(0,4) + '…' + _stakeWallet.slice(-4), 'warn');
+  txt('stake-wallet-display', _stakeWallet.slice(0,4) + '…' + _stakeWallet.slice(-4));
+  await checkStake(_stakeWallet);
+}
+
+function _onWalletDisconnect() {
+  disconnectStakeWallet();
 }
 
 function disconnectStakeWallet() {
@@ -1520,6 +1621,9 @@ async function checkStake(wallet) {
   } else {
     addLog('No stake found for wallet ' + shortAddr, 'warn');
   }
+
+  // Keep overview stake card in sync
+  refreshOvStake();
 }
 
 // ── Inference Chat ────────────────────────────────────────────────────────────
@@ -1541,7 +1645,7 @@ async function _inferCheckStatus() {
     const d = await r.json();
     if (r.ok && d.available) {
       if (dot) dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:var(--yellow);flex-shrink:0;box-shadow:0 0 6px var(--yellow);transition:background .3s';
-      txt('infer-status-text', `Ready · ${d.endpoint || 'localhost:19200'} · free`);
+      txt('infer-status-text', `Ready · ${d.endpoint || 'localhost:19200'}`);
       $('infer-send').disabled = false;
     } else {
       if (dot) dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:var(--amber);flex-shrink:0;transition:background .3s';
@@ -1683,11 +1787,15 @@ async function init() {
   await loadStatus();
   await loadIdentity();
   await loadNetwork();
-  await loadStakeConfig();  // pre-load so staking tab is instant
+  await loadStakeConfig();
+  await loadLlmStatus();
+  refreshOvStake();
 
   setInterval(async () => {
     await loadStatus();
     await loadNetwork();
+    await loadLlmStatus();
+    refreshOvStake();
     if ($('panel-agent')?.classList.contains('active'))   await loadAgentData();
     if ($('panel-staking')?.classList.contains('active') && _stakeWallet) await checkStake(_stakeWallet);
   }, 15_000);
