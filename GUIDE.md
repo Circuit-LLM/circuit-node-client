@@ -1,19 +1,16 @@
 # CIRCUIT Node Client — Setup & User Guide
 
-Run a node on the CIRCUIT distributed Solana data and inference network. This guide walks you through installation, configuration, the dashboard, LLM worker setup, and CIRC token staking.
+Run a node on the CIRCUIT distributed Solana data and inference network. This guide covers installation, configuration, the dashboard, decentralized LLM inference, and CIRC token staking.
 
 ---
 
 ## What Is a CIRCUIT Node?
 
-CIRCUIT is a Solana-native data network. The canonical node at [circuitllm.xyz](https://circuitllm.xyz) aggregates on-chain data — token prices, wallet analytics, DEX pool data, validator stats — and serves it through a paid API gated by x402 CIRC micropayments.
+CIRCUIT is a Solana-native network combining two layers:
 
-Running a node gives you:
+**Data mesh** — the canonical node at [circuitllm.xyz](https://circuitllm.xyz) aggregates on-chain data (token prices, wallet analytics, DEX pool data, validator stats) and serves it through an API gated by x402 CIRC micropayments. Running a node participates in the distributed mesh that will eventually serve this data without relying on the canonical hub.
 
-- A local proxy to the CIRCUIT data API
-- Participation in the distributed data mesh as it grows through Phase 2 and Phase 3
-- **LLM inference earnings** — optionally run a transformer layer shard and earn CIRC for compute contributed to the decentralized inference network
-- A path to staked RPC access in Phase 3
+**Decentralized LLM inference** — a pipeline of worker nodes, each holding a shard of a transformer model (Qwen2.5-0.5B), cooperating to run inference requests across the network. Node operators earn CIRC for compute contributed. Any node operator can chat with the inference network for free from their dashboard.
 
 ---
 
@@ -23,6 +20,7 @@ Running a node gives you:
 - **Git**
 - **Internet access** to reach `node.circuitllm.xyz`
 - A terminal on macOS, Linux, or WSL on Windows
+- ~80MB RAM if enabling the LLM inference worker (optional)
 
 ---
 
@@ -34,7 +32,7 @@ cd circuit-node-client
 npm install
 ```
 
-That's it. No build step required.
+No build step required.
 
 ---
 
@@ -54,13 +52,13 @@ Open `config/client.json` in any text editor. The most important fields:
     "registryUrl": "https://node.circuitllm.xyz"
   },
   "node": {
-    "region":   "us-east",
-    "apiPort":  19000
+    "region":  "us-east",
+    "apiPort": 19000
   }
 }
 ```
 
-**Region codes** — pick the closest:
+**Region codes:**
 
 | Code | Location |
 |------|----------|
@@ -71,7 +69,7 @@ Open `config/client.json` in any text editor. The most important fields:
 | `ap-southeast` | Southeast Asia |
 | `ap-northeast` | Northeast Asia |
 
-**Port** — `19000` is the default dashboard and API port. Change it here if something else is already using that port.
+**Port** — `19000` is the default. Change it in `node.apiPort` if something else is already using that port.
 
 If you don't create `config/client.json` before starting, the node automatically copies the example on first launch.
 
@@ -87,7 +85,7 @@ On first run the node:
 
 1. Generates a permanent ed25519 keypair and saves it to `data/identity.json`
 2. Announces itself to the CIRCUIT network registry
-3. Starts the dashboard and local API server on port 19000
+3. Starts the dashboard and local API server on the configured port
 4. Begins sending heartbeats every 60 seconds to stay registered
 
 You'll see output like:
@@ -100,7 +98,7 @@ You'll see output like:
 
 Open `http://localhost:19000` in your browser.
 
-> **Critical:** `data/identity.json` is your node's permanent identity. Back it up. If you delete it you lose your node ID and your RPC key and will need to re-register as a new node.
+> **Critical:** `data/identity.json` is your node's permanent identity. Back it up. Deleting it means losing your node ID and having to re-register as a new node.
 
 ---
 
@@ -126,7 +124,7 @@ The dashboard runs at `http://localhost:19000`. It has seven tabs.
 
 The home screen. Shows at a glance:
 
-- **Node status** — online/offline, your Node ID (first 16 characters shown), software version, region
+- **Node status** — online/offline, your Node ID (first 16 characters), software version, region
 - **Network sync** — whether your local cache is in sync with the canonical hub
 - **Hub connection** — reachability of `node.circuitllm.xyz`
 - **Activity log** — rolling log of node events (registration, heartbeats, update checks)
@@ -138,9 +136,9 @@ If the hub shows as unreachable, check your internet connection. The node contin
 
 ### Keys Tab
 
-Shows your **Node ID** — the base64 ed25519 public key that identifies your node on the network. This is safe to share publicly. All registry communications are signed with the corresponding private key stored in `data/identity.json`.
+Shows your **Node ID** — the base64 ed25519 public key that identifies your node on the network. This is safe to share publicly. All registry communications are signed with the corresponding private key in `data/identity.json`.
 
-Network RPC key issuance is coming in a future release.
+Also contains the **CIRC Staking** panel — connect your Phantom or Solflare wallet to verify your on-chain stake position. See the [CIRC Staking](#circ-staking) section below.
 
 ---
 
@@ -148,31 +146,31 @@ Network RPC key issuance is coming in a future release.
 
 Shows the state of the broader CIRCUIT mesh:
 
-- **Live node map** — all nodes currently registered on the network, their regions, and online status
+- **Live node map** — all nodes currently registered, their regions, and online status
 - **Shard coverage** — which data shards are covered by how many nodes
 - **Version distribution** — what software versions the network is running
-- **Peer list** — direct peers visible to your node
+- **Peer list** — nodes visible to the registry
 
-In Phase 1 all nodes run the full `all` shard set and proxy data from the canonical hub. In Phase 2 each node will be assigned 3 of 8 specialized shards based on a consistent hash of its Node ID — token analytics, wallet data, DEX pool data, oracle prices, etc. The shard assignment you'll receive in Phase 2 is deterministic and you can see it here.
+In Phase 1 all nodes run the full `all` shard set and proxy data from the canonical hub. In Phase 2, each node will be assigned 3 of 8 specialized shards based on a consistent hash of its Node ID. The shard assignment for your node is deterministic — you can see it now in the shard section.
 
 ---
 
 ### Updates Tab
 
-CIRCUIT ships signed updates automatically. This tab shows:
+Shows:
 
-- **Current version** vs. **latest available**
-- **Update history** — timestamp and version of each previous update
+- **Current version** vs. **latest available** on GitHub
+- **Update history** — timestamp and version of each previous update applied
 - **Rollback controls** — revert to any previous version if needed
 
-Updates are cryptographically verified before being applied:
+Updates are verified before being applied:
 
 1. SHA-256 checksum of the downloaded archive must match
-2. ed25519 signature from the Circuit LLM operator key must verify
+2. ed25519 signature from the Circuit LLM operator key must verify (if `signingPublicKey` is set)
 
-If either check fails, the update is rejected and your current version stays in place. The node backs up your installation before applying any update, so rollback is always available.
+If either check fails, the update is rejected and the current version stays. The node backs up your installation before applying any update.
 
-Auto-update is on by default. To disable it:
+Auto-update is on by default. To disable:
 
 ```json
 "updates": { "autoUpdate": false }
@@ -182,11 +180,20 @@ Auto-update is on by default. To disable it:
 
 ### Inference Tab
 
-A free LLM chat interface that speaks directly to the CIRCUIT decentralized inference network (`inference.circuitllm.xyz`). The chat is proxied through the node's local API at `/inference/chat`.
+A **free** streaming LLM chat interface connected directly to the CIRCUIT decentralized inference network.
 
-**Free for co-located nodes** — if the inference coordinator is running on the same machine as your node client (the default VPS setup), requests hit `localhost:19200` and bypass the x402 payment gate. Remote node clients not co-located with a coordinator will see a payment-required message.
+**How it works:**
 
-The chat maintains conversation context across turns (up to 12 messages), supports streaming responses, and includes a **Clear** button to reset the session.
+The chat is proxied through your node's local API at `POST /inference/chat`. The node tries to reach the inference coordinator at `localhost:19200` first. If the coordinator is running on the same machine as your node client, it bypasses the x402 payment gate and inference is **completely free**. Remote nodes not co-located with a coordinator will see a payment-required message.
+
+**Features:**
+
+- Streams responses token-by-token as the distributed pipeline processes them
+- Maintains conversation context across turns (up to 12 messages)
+- **CLEAR** button to reset the session
+- Status bar shows coordinator availability and model name
+
+The model is Qwen2.5-0.5B-Instruct, running distributed across the worker mesh.
 
 ---
 
@@ -197,7 +204,7 @@ If you've connected a `circuit-agent` by setting `agentDataPath` in your config,
 - Open trading positions
 - Recent trade history
 - Agent P&L
-- Active session strategy
+- Wallet and session info
 
 To connect an agent:
 
@@ -214,9 +221,9 @@ If no agent is connected, this tab shows "agent not configured."
 
 ### Chat Tab
 
-When an agent is connected, this tab gives you an LLM chat interface that speaks as your trading agent — it has full context of open positions, trade history, and active strategy.
+When an agent is connected, this tab gives you an LLM chat interface that speaks as your trading agent — with full context of open positions, trade history, and active strategy.
 
-The chat uses your agent's configured OpenRouter key. No separate key needed in the node config.
+The chat uses your agent's configured OpenRouter key. No separate key is needed in the node config.
 
 The WebSocket connection is at `ws://localhost:19000/chat` and only accepts localhost connections — it is not exposed externally.
 
@@ -224,9 +231,9 @@ The WebSocket connection is at `ws://localhost:19000/chat` and only accepts loca
 
 ## LLM Inference Worker
 
-Your node can join the CIRCUIT decentralized inference network. When enabled, the coordinator at `inference.circuitllm.xyz` streams a transformer layer shard to your node. During inference requests, your node processes its assigned layers in a pipeline alongside other nodes.
+Your node can join the CIRCUIT decentralized inference network and earn CIRC for compute. When enabled, the coordinator at `inference.circuitllm.xyz` assigns your node a shard of transformer layers. During inference requests, all nodes process their assigned layers in sequence as a pipeline.
 
-**CIRC earnings** — each inference payment is split proportionally across all nodes based on the share of transformer layers they handle.
+**CIRC earnings** — each inference payment is split proportionally across all active nodes based on the share of transformer layers they handle.
 
 ### Enabling the Worker
 
@@ -234,10 +241,10 @@ In `config/client.json`:
 
 ```json
 "llmWorker": {
-  "enabled": true,
-  "port": 19110,
+  "enabled":        true,
+  "port":           19110,
   "coordinatorUrl": "https://inference.circuitllm.xyz",
-  "walletAddress": "YourSolanaWalletAddress"
+  "walletAddress":  "YourSolanaWalletAddress"
 }
 ```
 
@@ -245,31 +252,32 @@ In `config/client.json`:
 |-------|-------------|
 | `enabled` | Set `true` to join the network |
 | `port` | TCP port the coordinator connects to for tensor pipeline traffic |
-| `coordinatorUrl` | The inference coordinator (do not change) |
-| `walletAddress` | Your Solana wallet — where CIRC earnings are attributed |
+| `coordinatorUrl` | The inference coordinator — do not change |
+| `walletAddress` | Your Solana wallet for CIRC earnings attribution |
 
-> The weight-delivery HTTP port is always `port + 1000` (e.g. port 19110 → weight delivery on 20110). Both ports must be reachable from the coordinator.
+> The weight-delivery HTTP port is always `port + 1000` (e.g. 19110 → weight delivery on 20110). Both ports must be reachable inbound from the coordinator.
 
 ### What Happens at Startup
 
 1. The LLM worker process starts on the configured port
 2. It registers with the coordinator and receives its layer assignment (e.g. layers 4–7 of 24)
-3. The coordinator streams the model weight shard for those layers (~40MB per node)
-4. Your node is now part of the inference pipeline
+3. The coordinator streams the model weight shard for those layers (~40MB)
+4. Your node is now active in the inference pipeline
 
-You can check worker status at `GET /llm/status` on your node API, or see it in the dashboard health endpoint.
+Check worker status at `GET /llm/status` on your node API, or see it in the `/health` response.
 
 ### Resource Usage
 
-- **RAM**: ~80MB per node for a 4-layer shard of Qwen2.5-0.5B
-- **CPU**: Bursts during inference steps (~1–2 seconds per request)
-- **Network**: Initial weight download (~40MB), then lightweight tensor traffic during inference
+- **RAM** — ~80MB per node for a 4-layer shard of Qwen2.5-0.5B
+- **CPU** — bursts during inference steps (~1–2 seconds per request)
+- **Network** — initial weight download (~40MB), then lightweight tensor traffic during inference
 
 ### Firewall Note
 
-The coordinator initiates the TCP connection to your worker. If you're behind a firewall or NAT:
-- Open inbound TCP on your worker port (default 19110)
-- Open inbound TCP on your weight-delivery port (default 20110)
+The coordinator initiates TCP connections **to your worker**. If you're behind a firewall or NAT, open inbound TCP on:
+
+- Your worker port (default `19110`)
+- Your weight-delivery port (default `20110`)
 
 ---
 
@@ -277,7 +285,7 @@ The coordinator initiates the TCP connection to your worker. If you're behind a 
 
 ### What Staking Does
 
-In the current Phase 1 build, staking CIRC into the CIRCUIT StakePoint pool verifies your token ownership on-chain. The staking panel in the Keys tab shows your stake status, but does not yet gate access — staking is pre-staged for the Phase 3 activation where CIRC stake will determine your RPC tier.
+In the current Phase 1 build, staking CIRC into the CIRCUIT StakePoint pool verifies your token ownership on-chain. The staking panel in the Keys tab shows your stake status but does not yet gate access — staking is pre-staged for Phase 3, where CIRC stake will determine RPC tier.
 
 In Phase 3:
 - Stake CIRC → maintain RPC credentials for yourself and your agents
@@ -286,41 +294,39 @@ In Phase 3:
 
 ### Connecting Your Wallet
 
-In the **Keys tab**, find the **CIRC Staking** card. Click **Connect Wallet**.
+In the **Keys tab**, find the **CIRC Staking Access** card. Click **Connect Wallet**.
 
-This opens your Phantom or Solflare wallet extension (whichever you have installed). Approve the connection — no transaction is signed, this is a read-only check.
+This opens your Phantom or Solflare wallet extension. Approve the connection — no transaction is signed, this is a read-only check to see your stake balance.
 
-Your wallet address is saved in the browser's local storage so the next time you load the dashboard you're already connected without re-approving.
+Your wallet address is saved in browser local storage, so the next dashboard load reconnects automatically.
 
 ### What the Staking Panel Shows
 
 Once your wallet is connected:
 
-- **Status badge** — `● UNLOCKED` (yellow, glowing) if your stake meets the minimum, `● LOCKED` if not
-- **Staked amount** — total CIRC across all your positions in the pool, summed precisely
-- **Required minimum** — the minimum stake required for access (set by the pool config)
+- **Status badge** — `● UNLOCKED` (yellow, glowing) if your stake meets the minimum, `○ STAKE REQUIRED` if not
+- **Staked amount** — total CIRC across all your positions in the pool
+- **Required minimum** — the threshold configured by the pool
 - **Progress bar** — visual fill showing staked / required ratio
 - **Lock status** — if your stake has an active time-lock and when it expires
-- **Pool link** — direct link to the StakePoint pool page to stake or add to your position
+- **Pool link** — direct link to the StakePoint pool page
 
 ### Staking CIRC
 
-1. Go to the StakePoint pool URL shown in the panel (or navigate to [stakepoint.app](https://stakepoint.app) and find the CIRCUIT pool)
+1. Go to the StakePoint pool URL shown in the panel (or [stakepoint.app](https://stakepoint.app) → find the CIRCUIT pool)
 2. Connect your Solana wallet on StakePoint
-3. Stake your CIRC — choose an amount and an optional lock period (longer locks earn higher APR)
+3. Stake your CIRC — choose an amount and optional lock period (longer locks earn higher APR)
 4. Once the transaction confirms, click **Refresh** in the dashboard staking panel
 
-The dashboard queries the stake on-chain directly via `getProgramAccounts` — no intermediary API, no trust required. Verification reflects the true on-chain state within a 5-minute cache window.
+The dashboard queries stake positions on-chain directly — no intermediary API, no trust required. Reflects true on-chain state within a 5-minute cache window.
 
 ### Multiple Positions
 
-If you've staked in multiple transactions, you may have multiple positions in the pool. The dashboard sums all of them — only the total matters for the access gate. You don't need to consolidate.
+If you've staked in multiple transactions you may have multiple positions. The dashboard sums all of them — only the total matters for the access gate.
 
 ### When You Unstake
 
-Unstaking on StakePoint reduces or zeroes your `staked_amount` on-chain. The dashboard will reflect this at the next check (within 5 minutes). If your total falls below the minimum, your access badge changes to `● LOCKED`.
-
-Tokens with an active time-lock cannot be unstaked until the lock period expires — this is enforced by the StakePoint program on-chain.
+Unstaking on StakePoint reduces your `staked_amount` on-chain. The dashboard reflects this at the next check (within 5 minutes). If your total falls below the minimum, the badge changes to `○ STAKE REQUIRED`. Tokens with an active time-lock cannot be unstaked until the lock period expires — enforced by the StakePoint program.
 
 ---
 
@@ -332,9 +338,7 @@ For a server or always-on machine, run the node as a systemd user service so it 
 # Copy the service template
 cp deploy/circuit-node-client.service ~/.config/systemd/user/
 
-# Open the file and verify the paths are correct
-# WorkingDirectory should point to your circuit-node-client directory
-# ExecStart should point to your node binary
+# Edit WorkingDirectory and ExecStart paths
 nano ~/.config/systemd/user/circuit-node-client.service
 
 # Reload systemd and enable
@@ -346,7 +350,7 @@ systemctl --user start circuit-node-client
 loginctl enable-linger $USER
 ```
 
-Check status and logs:
+Check status and tail logs:
 
 ```bash
 systemctl --user status circuit-node-client
@@ -362,26 +366,28 @@ circuit-node-client/
 ├── node-client.js          Entry point + CLI
 ├── worker.js               LLM inference worker (spawned when llmWorker.enabled)
 ├── config/
-│   ├── client.example.json Template (do not edit — copy to client.json)
+│   ├── client.example.json Template — copy to client.json before editing
 │   └── client.json         Your config (gitignored)
 ├── lib/
 │   ├── identity.js         ed25519 keypair management
 │   ├── registry.js         Network announce + heartbeat
-│   ├── server.js           Dashboard API + proxy
-│   ├── llm-worker.js       LLM inference worker process manager
+│   ├── server.js           API server + inference chat SSE proxy
+│   ├── llm-worker.js       LLM inference worker child-process manager
 │   ├── inference/          GGML dequantization + Qwen2 transformer forward pass
-│   ├── access.js           CIRC stake verification
-│   ├── stakepoint.js       On-chain StakePoint query module
+│   ├── access.js           CIRC stake verification + Phase 3 encryption stub
+│   ├── stakepoint.js       On-chain StakePoint position query module
 │   ├── shard.js            Shard assignment + routing
-│   ├── sync.js             Data sync
-│   ├── agent.js            Agent monitoring loop
-│   ├── circuit-agent.js    Paired agent data reader
-│   ├── chat.js             WebSocket chat bridge
-│   └── updater.js          Signed update manager
+│   ├── sync.js             Data sync (Phase 1: HTTP poll, Phase 2: gRPC)
+│   ├── agent.js            circuit-agent monitoring loop
+│   ├── circuit-agent.js    Paired circuit-agent data file reader
+│   ├── chat.js             WebSocket agent chat bridge
+│   └── updater.js          Signed update download, verify, and apply
 ├── ui/
-│   └── dashboard.html      Single-page dashboard
+│   └── dashboard.html      Single-page dashboard (7 tabs)
 ├── deploy/
-│   └── circuit-node-client.service  systemd template
+│   ├── generate-signing-key.js   Operator: one-time signing key setup
+│   ├── publish-update.js         Operator: sign and publish a release
+│   └── circuit-node-client.service  systemd unit template
 └── data/                   Runtime data (gitignored — back this up)
     ├── identity.json        ← YOUR NODE IDENTITY. BACK THIS UP.
     ├── cache/               Sync'd data slices
@@ -394,41 +400,45 @@ circuit-node-client/
 
 | Concern | How It's Handled |
 |---------|-----------------|
-| Private key exposure | `data/identity.json` chmod 600, gitignored |
-| Malicious updates | ed25519 signature + SHA-256 checksum before install |
+| Private key exposure | `data/identity.json` gitignored, never logged |
+| Malicious updates | SHA-256 checksum + ed25519 operator signature before install |
 | Node impersonation | All registry mutations are signature-verified |
-| External chat access | WebSocket accepts localhost only |
+| Inference access | x402 CIRC payment gate on external endpoint; localhost bypass for co-located nodes |
+| External chat access | WebSocket accepts localhost connections only |
 | Phase 3 data access | AES-256-GCM, key derivation requires CIRC stake |
 
 **Files to never commit:**
 
 ```
-data/identity.json      ← your node private key
+data/identity.json     ← your node private key
+config/client.json     ← your local config (may contain wallet address)
 ```
 
-Both are in `.gitignore` by default. Double-check before pushing a fork.
+Both are in `.gitignore` by default.
 
 ---
 
 ## Troubleshooting
 
-**Port already in use on 19000**
+**Port already in use**
 
 ```bash
-# Find what's using the port
-lsof -ti:19000
-
-# Change your port in config/client.json:
+lsof -ti:19000       # find what's using the port
+# then in config/client.json:
 "node": { "apiPort": 19001 }
 ```
 
-**Node shows offline on the network tab**
+**Node shows offline on the Network tab**
 
 The registry marks nodes offline after 3 missed heartbeats (~3 minutes). If you just restarted, wait one cycle. If it stays offline, check that `node.circuitllm.xyz` is reachable from your machine.
 
+**Inference tab says "coordinator not on localhost"**
+
+The inference coordinator is not running on this machine. The free inference bypass only works when the coordinator is co-located (same host). To use inference from a remote node, you would need to pay the x402 CIRC gate, or run a coordinator locally.
+
 **Staking panel shows "pool not configured"**
 
-The CIRC staking pool must be added to `config/client.json`:
+Add the pool address to `config/client.json`:
 
 ```json
 "access": {
@@ -445,7 +455,7 @@ Wallet connect requires a browser extension. Install [Phantom](https://phantom.a
 
 **Update failed — signature verification error**
 
-This means the downloaded archive doesn't match what Circuit LLM signed. This usually indicates a network interruption during download. The node keeps your current version. Run `node node-client.js update` again to retry.
+The downloaded archive doesn't match what Circuit LLM signed. Usually a network interruption. The node keeps your current version. Run `node node-client.js update` to retry.
 
 ---
 
@@ -453,8 +463,6 @@ This means the downloaded archive doesn't match what Circuit LLM signed. This us
 
 | Phase | Status | What Changes |
 |-------|--------|-------------|
-| Phase 1 | **Now** | Node registers, gets `pnk_` RPC key, proxies data from canonical hub |
-| Phase 2 | Upcoming | Shard specialization — each node owns and serves a slice of indexed data |
-| Phase 3 | Planned | CIRC staking gates RPC tiers — stake more CIRC, get higher rate limits and priority routing |
-
-Your node ID and RPC key carry forward through all phases unchanged.
+| Phase 1 | **Now** | Node registers, proxies data from canonical hub, joins LLM inference pipeline |
+| Phase 2 | Upcoming | Shard specialization — each node owns and serves a dedicated slice of indexed data |
+| Phase 3 | Planned | CIRC staking gates RPC tiers — higher stake = higher rate limits and priority routing |
