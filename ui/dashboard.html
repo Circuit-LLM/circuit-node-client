@@ -306,18 +306,11 @@ tr:last-child td{border-bottom:none}
 
   <!-- ── RPC KEY ── -->
   <section class="panel" id="panel-rpc">
-    <div class="card mb">
-      <div class="card-t">Your RPC API Key</div>
+    <div class="card mb" style="opacity:.5;pointer-events:none">
+      <div class="card-t">RPC API Key <span style="font-size:9px;color:var(--yellow);letter-spacing:.08em;margin-left:8px">COMING SOON</span></div>
       <p style="font-size:11px;color:var(--muted);line-height:1.8;margin-bottom:14px">
-        This key grants access to your node's local API. Share it with applications
-        running on this machine, or with trusted users you want to give free access
-        to this node's data endpoints.
+        Network RPC key issuance is not yet active. This feature will be enabled in a future release.
       </p>
-      <div class="key-box-label"><span>RPC KEY</span><span class="copy-hint">click to copy</span></div>
-      <div class="key-box" id="rpc-key-box" onclick="copyKey('rpc-key-val','rpc-copied')">
-        <span id="rpc-key-val">generating…</span>
-        <span class="key-copied" id="rpc-copied">copied ✓</span>
-      </div>
     </div>
 
     <div class="card mb">
@@ -565,7 +558,7 @@ tr:last-child td{border-bottom:none}
         <br><br>
         Example: <code style="color:var(--green)">"agentDataPath": "../circuit-agent/data"</code><br><br>
         Pair an agent to enable the chat interface and agent dashboard tab. The agent uses your node's
-        pnk_ RPC key for Solana calls. Data API calls (x402) apply normally.
+        Data API calls (x402) apply normally.
       </p>
     </div>
 
@@ -765,8 +758,6 @@ async function loadIdentity() {
   const nodeId = data.nodeId ?? '';
   txt('nodeid-val', nodeId);
   // Derive RPC key from nodeId (first 43 chars of base64, prefixed)
-  const rpcKey = 'pnk_' + nodeId.replace(/[^A-Za-z0-9]/g, '').slice(0, 40);
-  txt('rpc-key-val', rpcKey);
   txt('rpc-base-url', `http://localhost:${PORT}`);
   txt('ex-url-1', `http://localhost:${PORT}`);
   txt('h-agent', data.agentRunning ? 'RUNNING' : 'OFF', data.agentRunning ? 'green' : '');

@@ -35,6 +35,7 @@ const sync       = require('./lib/sync');
 const server     = require('./lib/server');
 const updater    = require('./lib/updater');
 const circuitAgent = require('./lib/circuit-agent');
+const llmWorker  = require('./lib/llm-worker');
 const { computeAssignment } = require('./lib/shard');
 
 const CONFIG_FILE  = path.join(__dirname, 'config', 'client.json');
@@ -172,6 +173,12 @@ async function runNode() {
     agent.start(config);
   }
 
+  // 7. Start LLM worker sidecar if enabled
+  if (config.llmWorker?.enabled) {
+    llmWorker.start(config.llmWorker);
+    console.log(`[node-client] ✓ LLM worker starting on port ${config.llmWorker.port ?? 19110}`);
+  }
+
   console.log('');
   const port = config.node.apiPort;
   console.log(`[node-client] ✓ Node running`);
@@ -183,6 +190,9 @@ async function runNode() {
   } else {
     console.log(`[node-client] ✓ Chat:      ws://localhost:${port}/chat  (set agentDataPath to enable)`);
   }
+  if (config.llmWorker?.enabled) {
+    console.log(`[node-client] ✓ LLM worker: TCP port ${config.llmWorker.port ?? 19110}  →  ${config.llmWorker.coordinatorUrl ?? 'coordinator'}`);
+  }
   console.log('');
 
   // ── Graceful shutdown ─────────────────────────────────────────────────────
@@ -191,6 +201,7 @@ async function runNode() {
     sync.stop();
     server.stop();
     updater.stop();
+    llmWorker.stop();
     await registry.deregister(config);
     console.log('[node-client] Goodbye.');
     process.exit(0);

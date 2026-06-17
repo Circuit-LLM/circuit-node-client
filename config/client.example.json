@@ -60,5 +60,18 @@
 
   "logging": {
     "level": "info"
+  },
+
+  "llmWorker": {
+    "enabled":        false,
+    "_enabledNote":   "Set to true to join the Circuit decentralized LLM inference network. Your node will receive a transformer layer shard and earn CIRC for compute.",
+    "port":           19110,
+    "_portNote":      "TCP port the coordinator connects to for tensor pipeline. Must be unique per node. HTTP weight-delivery port = this port + 1000.",
+    "coordinatorUrl": "https://inference.circuitllm.xyz",
+    "_coordNote":     "URL of the circuit-decentralized-llm coordinator.",
+    "clusterKey":     "",
+    "_keyNote":       "Shared secret for coordinator authentication. Leave blank for open clusters. Must match coordinator clusterKey.",
+    "walletAddress":  null,
+    "_walletNote":    "Your Solana wallet address for CIRC payment attribution. If set, you earn a share of inference fees proportional to layers you run."
   }
 }

@@ -1,6 +1,6 @@
 # CIRCUIT Node Client — Setup & User Guide
 
-Run a node on the CIRCUIT distributed Solana data network. This guide walks you through installation, dashboard navigation, your RPC key, and CIRC token staking.
+Run a node on the CIRCUIT distributed Solana data and inference network. This guide walks you through installation, configuration, the dashboard, LLM worker setup, and CIRC token staking.
 
 ---
 
@@ -10,11 +10,10 @@ CIRCUIT is a Solana-native data network. The canonical node at [circuitllm.xyz](
 
 Running a node gives you:
 
-- A permanent `pnk_` Solana RPC key derived from your node identity
 - A local proxy to the CIRCUIT data API
 - Participation in the distributed data mesh as it grows through Phase 2 and Phase 3
-
-The RPC key is the main day-to-day benefit. It lets you point any Solana dApp, trading bot, or AI agent at a CIRCUIT-backed RPC endpoint without setting up your own validator connection.
+- **LLM inference earnings** — optionally run a transformer layer shard and earn CIRC for compute contributed to the decentralized inference network
+- A path to staked RPC access in Phase 3
 
 ---
 
@@ -137,36 +136,11 @@ If the hub shows as unreachable, check your internet connection. The node contin
 
 ---
 
-### RPC Key Tab
+### Keys Tab
 
-This is the most-used tab. It shows:
+Shows your **Node ID** — the base64 ed25519 public key that identifies your node on the network. This is safe to share publicly. All registry communications are signed with the corresponding private key stored in `data/identity.json`.
 
-- Your **`pnk_` RPC key** — a permanent, deterministic key derived from your node identity
-- Your full **Node ID** (base64 ed25519 public key)
-- **Usage examples** showing how to connect your app or agent to the CIRCUIT RPC endpoint
-- **CIRC staking status** (see the Staking section below)
-
-The `pnk_` key is not stored anywhere. It is recomputed from `data/identity.json` every time the node starts. As long as you don't delete your identity file, your key is always the same.
-
-**Using your RPC key:**
-
-```
-https://rpc.circuitllm.xyz/?key=pnk_your40charkey
-```
-
-In any Solana SDK:
-
-```javascript
-// JavaScript / @solana/web3.js
-const { Connection } = require('@solana/web3.js');
-const connection = new Connection('https://rpc.circuitllm.xyz/?key=pnk_your40charkey');
-
-// Python / solana-py
-from solana.rpc.api import Client
-client = Client('https://rpc.circuitllm.xyz/?key=pnk_your40charkey')
-```
-
-This is a standard Solana JSON-RPC endpoint — it accepts all the same calls as Helius, QuickNode, or mainnet-beta. Drop it into any app that currently uses a different RPC URL.
+Network RPC key issuance is coming in a future release.
 
 ---
 
@@ -238,11 +212,62 @@ The WebSocket connection is at `ws://localhost:19000/chat` and only accepts loca
 
 ---
 
+## LLM Inference Worker
+
+Your node can join the CIRCUIT decentralized inference network. When enabled, the coordinator at `inference.circuitllm.xyz` streams a transformer layer shard to your node. During inference requests, your node processes its assigned layers in a pipeline alongside other nodes.
+
+**CIRC earnings** — each inference payment is split proportionally across all nodes based on the share of transformer layers they handle.
+
+### Enabling the Worker
+
+In `config/client.json`:
+
+```json
+"llmWorker": {
+  "enabled": true,
+  "port": 19110,
+  "coordinatorUrl": "https://inference.circuitllm.xyz",
+  "walletAddress": "YourSolanaWalletAddress"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `enabled` | Set `true` to join the network |
+| `port` | TCP port the coordinator connects to for tensor pipeline traffic |
+| `coordinatorUrl` | The inference coordinator (do not change) |
+| `walletAddress` | Your Solana wallet — where CIRC earnings are attributed |
+
+> The weight-delivery HTTP port is always `port + 1000` (e.g. port 19110 → weight delivery on 20110). Both ports must be reachable from the coordinator.
+
+### What Happens at Startup
+
+1. The LLM worker process starts on the configured port
+2. It registers with the coordinator and receives its layer assignment (e.g. layers 4–7 of 24)
+3. The coordinator streams the model weight shard for those layers (~40MB per node)
+4. Your node is now part of the inference pipeline
+
+You can check worker status at `GET /llm/status` on your node API, or see it in the dashboard health endpoint.
+
+### Resource Usage
+
+- **RAM**: ~80MB per node for a 4-layer shard of Qwen2.5-0.5B
+- **CPU**: Bursts during inference steps (~1–2 seconds per request)
+- **Network**: Initial weight download (~40MB), then lightweight tensor traffic during inference
+
+### Firewall Note
+
+The coordinator initiates the TCP connection to your worker. If you're behind a firewall or NAT:
+- Open inbound TCP on your worker port (default 19110)
+- Open inbound TCP on your weight-delivery port (default 20110)
+
+---
+
 ## CIRC Staking
 
 ### What Staking Does
 
-In the current Phase 1 build, staking CIRC into the CIRCUIT StakePoint pool verifies your token ownership on-chain. The staking panel in the RPC Key tab shows your stake status, but does not yet gate access — staking is pre-staged for the Phase 3 activation where CIRC stake will determine your RPC tier.
+In the current Phase 1 build, staking CIRC into the CIRCUIT StakePoint pool verifies your token ownership on-chain. The staking panel in the Keys tab shows your stake status, but does not yet gate access — staking is pre-staged for the Phase 3 activation where CIRC stake will determine your RPC tier.
 
 In Phase 3:
 - Stake CIRC → maintain RPC credentials for yourself and your agents
@@ -251,7 +276,7 @@ In Phase 3:
 
 ### Connecting Your Wallet
 
-In the **RPC Key tab**, find the **CIRC Staking** card. Click **Connect Wallet**.
+In the **Keys tab**, find the **CIRC Staking** card. Click **Connect Wallet**.
 
 This opens your Phantom or Solflare wallet extension (whichever you have installed). Approve the connection — no transaction is signed, this is a read-only check.
 
@@ -325,13 +350,16 @@ journalctl --user -u circuit-node-client -f
 ```
 circuit-node-client/
 ├── node-client.js          Entry point + CLI
+├── worker.js               LLM inference worker (spawned when llmWorker.enabled)
 ├── config/
 │   ├── client.example.json Template (do not edit — copy to client.json)
 │   └── client.json         Your config (gitignored)
 ├── lib/
 │   ├── identity.js         ed25519 keypair management
 │   ├── registry.js         Network announce + heartbeat
-│   ├── server.js           Dashboard API + RPC proxy
+│   ├── server.js           Dashboard API + proxy
+│   ├── llm-worker.js       LLM inference worker process manager
+│   ├── inference/          GGML dequantization + Qwen2 transformer forward pass
 │   ├── access.js           CIRC stake verification
 │   ├── stakepoint.js       On-chain StakePoint query module
 │   ├── shard.js            Shard assignment + routing
