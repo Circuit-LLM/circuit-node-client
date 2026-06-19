@@ -581,7 +581,7 @@ function _connect() {
     log('WARN', 'worker: already connected, skipping reconnect');
     return;
   }
-  const ws = new WebSocket(coordinatorUrl);
+  const ws = new WebSocket(coordinatorUrl, { maxPayload: 1024 * 1024 * 1024 }); // 1GB — supports 7B model shards
   _ws = ws;
 
   ws.on('open', () => {
