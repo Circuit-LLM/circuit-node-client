@@ -226,6 +226,10 @@ To disable auto-update:
 | Node impersonation | All registry mutations are signature-verified server-side |
 | Inference access | x402 CIRC payment gate on external endpoint; localhost bypass for co-located nodes |
 | External chat access | WebSocket chat accepts localhost connections only |
+| Cluster auth | Worker sends HMAC-SHA256 of `nodeId:timestamp` using `llmWorker.clusterKey` — must match coordinator's `CLUSTER_KEY` env var. Leave empty for localhost-only setups |
+| KV cache isolation | KV state resets at position 0 of each new sequence — no bleed between sessions |
+| Corrupt shards | Dequantization bounds-checked on load — truncated shards throw before inference |
+| Duplicate connections | Worker skips reconnect if already connected or connecting |
 | Phase 3 data access | AES-256-GCM, key derivation requires CIRC token ownership |
 
 **Files that must never be committed:**

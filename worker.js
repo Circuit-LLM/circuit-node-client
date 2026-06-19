@@ -1,26 +1,21 @@
-// worker.js — Circuit LLM worker process.
-//
-// Runs on circuit-node-client machines. Connects to the coordinator,
-// receives a layer assignment, and handles the TCP tensor forward-pass
-// server for pipeline-parallel inference.
-//
-// Usage:
-//   node worker.js                        # Start worker (config from worker.json)
-//   node worker.js --coordinator <host>   # Override coordinator host
-//   node worker.js --port <n>             # Override TCP listen port
-//   node worker.js status                 # Print current worker status
-//
-// This file is standalone — copy it to any circuit-node-client installation
-// to join the LLM pipeline without any other files from this repo.
 'use strict';
 
-const fs    = require('fs');
-const path  = require('path');
-const os    = require('os');
-const http  = require('http');
-const https = require('https');
+const fs        = require('fs');
+const path      = require('path');
+const os        = require('os');
+const http      = require('http');
+const https     = require('https');
+const crypto    = require('crypto');
+const { spawn } = require('child_process');
+const WebSocket = require('ws');
 
-// Worker-embedded logger (no dep on lib/ so this file is self-contained)
+// Native runner binary — local `native/` dir first, then central install
+const NATIVE_RUNNER_PATHS = [
+  path.join(__dirname, 'native', 'circuit-runner'),
+  '/home/watchtower/circuit-node-client/native/circuit-runner',
+];
+const NATIVE_RUNNER_BIN = NATIVE_RUNNER_PATHS.find(p => { try { fs.accessSync(p, fs.constants.X_OK); return true; } catch { return false; } }) ?? null;
+
 function log(level, msg, data) {
   const ts   = new Date().toISOString();
   const line = `[${ts}] [${level}] ${msg}${data ? ' ' + JSON.stringify(data) : ''}`;
@@ -45,45 +40,42 @@ if (CMD === 'status') {
 // ── Load config ────────────────────────────────────────────────────────────────
 const CONFIG_PATH = path.join(__dirname, 'config', 'worker.json');
 let cfg = {};
-try {
-  cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-} catch {}
+try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch {}
 
-// CLI overrides
-const coordIdx = argv.indexOf('--coordinator');
-const portIdx  = argv.indexOf('--port');
-const keyIdx   = argv.indexOf('--key');
-const hostIdx  = argv.indexOf('--host');
+const coordIdx  = argv.indexOf('--coordinator');
+const keyIdx    = argv.indexOf('--key');
+const walletIdx = argv.indexOf('--wallet');
 
-const workerPort      = portIdx  >= 0 ? parseInt(argv[portIdx  + 1] ?? '', 10) || 19210 : parseInt(cfg.port        ?? process.env.WORKER_PORT       ?? '19210', 10);
-const coordinatorHost = coordIdx >= 0 ? (argv[coordIdx + 1] ?? '')                      : (cfg.coordinator ?? process.env.COORDINATOR_HOST ?? 'localhost');
-const clusterKey      = keyIdx   >= 0 ? (argv[keyIdx   + 1] ?? '')                      : (cfg.clusterKey  ?? process.env.CLUSTER_KEY ?? '');
-// Public hostname/IP this worker should report when registering.
-// Required when the coordinator is remote and os.hostname() isn't reachable from it.
-const workerHost      = hostIdx  >= 0 ? (argv[hostIdx  + 1] ?? '')                      : (cfg.host        ?? process.env.WORKER_HOST ?? '');
+function _toWsUrl(raw) {
+  const s = (raw || '').replace(/^http:\/\//, 'ws://').replace(/^https:\/\//, 'wss://');
+  const u = s.startsWith('ws') ? s : 'ws://' + s;
+  try { const p = new URL(u); if (p.pathname === '/') p.pathname = '/workers'; return p.toString(); }
+  catch { return u.endsWith('/workers') ? u : u + '/workers'; }
+}
 
-// ── Inline worker server (self-contained copy of pipeline/worker-server.js) ──
-// Including it inline avoids requiring the node-client to install this package.
-
-const net    = require('net');
-const crypto = require('crypto');
+const coordinatorUrl = _toWsUrl(
+  coordIdx >= 0 ? argv[coordIdx + 1] : (cfg.coordinatorUrl ?? cfg.coordinator ?? 'localhost:19200')
+);
+const clusterKey    = keyIdx   >= 0 ? argv[keyIdx   + 1] : (cfg.clusterKey    ?? '');
+const walletAddress = walletIdx >= 0 ? argv[walletIdx+ 1] : (cfg.walletAddress ?? null);
 
 // Qwen2 forward pass (loaded lazily after shard is available)
 let Qwen2Worker = null;
 try { ({ Qwen2Worker } = require('./lib/inference/qwen2-worker')); } catch {}
 
-// Wire protocol constants (matches lib/pipeline/wire.js)
+// ── Wire protocol (matches lib/pipeline/wire.js) ───────────────────────────────
 const MAGIC      = 0xC1CC0001;
 const HEADER_LEN = 24;
 
 const MSG = {
+  HELLO:        0x00,
   PING:         0x01,
   PONG:         0x02,
   LAYER_ASSIGN: 0x10,
   LAYER_ACK:    0x11,
   TENSOR_FWD:   0x20,
   TENSOR_RET:   0x21,
-  AUTH_CHALLENGE: 0x05,
+  WEIGHT_SHARD: 0x30,
   ERROR:        0xFF,
 };
 
@@ -112,6 +104,11 @@ function encodeLayerAck(seqId, sessionId) {
   return encode(MSG.LAYER_ACK, Buffer.alloc(0), seqId, sessionId);
 }
 
+function encodeError(code, message, seqId, sessionId) {
+  const payload = Buffer.from(JSON.stringify({ code, message }), 'utf8');
+  return encode(MSG.ERROR, payload, seqId, sessionId);
+}
+
 function encodeTensorRet(data, shape, dtype, seqId, sessionId) {
   const ndim = shape.length;
   const payload = Buffer.allocUnsafe(4 + 4 + 4 * ndim + data.length);
@@ -132,63 +129,37 @@ function decodeTensor(payload) {
   return { dtype, shape, data: payload.slice(off) };
 }
 
-class FrameParser {
-  constructor(cb) { this._cb = cb; this._buf = Buffer.alloc(0); }
-  push(chunk) {
-    this._buf = Buffer.concat([this._buf, chunk]);
-    while (this._buf.length >= HEADER_LEN) {
-      if (this._buf.readUInt32LE(0) !== MAGIC) {
-        const idx = this._buf.indexOf(Buffer.from([0x01, 0x00, 0xCC, 0xC1]));
-        if (idx < 0) { this._buf = Buffer.alloc(0); return; }
-        this._buf = this._buf.slice(idx);
-        continue;
-      }
-      const payLen = this._buf.readUInt32LE(16);
-      const total  = HEADER_LEN + payLen;
-      if (this._buf.length < total) break;
-      const msgType   = this._buf.readUInt32LE(4);
-      const seqId     = this._buf.readUInt32LE(8);
-      const sessionId = this._buf.readUInt32LE(12);
-      const csum      = this._buf.readUInt32LE(20);
-      const payload   = this._buf.slice(HEADER_LEN, total);
-      this._buf = this._buf.slice(total);
-      if (djb2(payload) !== csum) continue; // drop corrupt frame
-      try { this._cb({ msgType, seqId, sessionId, payload }); } catch {}
-    }
-  }
-}
-
 // ── State ─────────────────────────────────────────────────────────────────────
-let _identity    = null; // loaded from disk or generated; used by shard cache + registration
-let _assignment  = null;
-let _server      = null;
-let _seqId       = 0;
-let _qwen2       = null; // Qwen2Worker instance, created when both shard+assignment are ready
-const stateFile  = path.join(__dirname, 'data', 'worker_state.json');
-const PEER_RANGE = 15_000; // ms between periodic state writes (event-triggered writes still happen immediately)
+let _identity       = null;
+let _assignment     = null;
+let _ws             = null;
+let _seqId          = 0;
+let _qwen2          = null;
+let _nativeRunner   = null;
+let _reconnectDelay = 2_000;
+let _reconnectTimer = null;
+const stateFile     = path.join(__dirname, 'data', 'worker_state.json');
+const PEER_RANGE    = 15_000;
 
-// Initialise Qwen2Worker once we have both the shard tensors and the layer assignment.
-// Derives actual layer range from tensor names in the shard (robust against re-assignment drift).
 function _tryInitQwen2() {
   if (_qwen2 || !Qwen2Worker || !_shardTensors) return;
   const a = (_assignment && _assignment.arch) ? _assignment.arch : {};
 
-  // Determine actual layer range from shard tensor names
   const blkLayers = _shardTensors
     .map(t => { const m = (t.name ?? '').match(/^blk\.(\d+)\./); return m ? parseInt(m[1]) : -1; })
     .filter(n => n >= 0);
-  if (blkLayers.length === 0) return; // no block tensors yet
+  if (blkLayers.length === 0) return;
 
   const shardStart = Math.min(...blkLayers);
   const shardEnd   = Math.max(...blkLayers);
 
   try {
     _qwen2 = new Qwen2Worker(_shardTensors, {
-      hiddenDim:    a.hiddenSize  ?? 896,
-      numHeads:     a.numHeads    ?? 14,
-      numKvHeads:   a.numKvHeads  ?? 2,
-      ffnDim:       a.ffnDim      ?? 4864,
-      rmsEps:       a.rmsEps      ?? 1e-6,
+      hiddenDim:    a.hiddenSize   ?? 896,
+      numHeads:     a.numHeads     ?? 14,
+      numKvHeads:   a.numKvHeads   ?? 2,
+      ffnDim:       a.ffnDim       ?? 4864,
+      rmsEps:       a.rmsEps       ?? 1e-6,
       ropeFreqBase: a.ropeFreqBase ?? 1000000,
       layerStart:   shardStart,
       layerEnd:     shardEnd,
@@ -200,10 +171,103 @@ function _tryInitQwen2() {
   }
 }
 
+// ── Native runner subprocess wrapper ──────────────────────────────────────────
+class NativeRunner {
+  constructor(shardPath, a, layerStart, layerEnd, modelType) {
+    const headDim = Math.floor((a.hiddenSize ?? 896) / (a.numHeads ?? 14));
+    const hasBias = !['llama3', 'llama-3'].includes(modelType ?? '');
+    const threads  = Math.max(1, Math.min(os.cpus().length, 4));
+    const args = [
+      '--shard',       shardPath,
+      '--hidden-dim',  String(a.hiddenSize   ?? 896),
+      '--n-heads',     String(a.numHeads     ?? 14),
+      '--n-kv-heads',  String(a.numKvHeads   ?? 2),
+      '--head-dim',    String(headDim),
+      '--ffn-dim',     String(a.ffnDim       ?? 4864),
+      '--layers',      `${layerStart}:${layerEnd}`,
+      '--rope-base',   String(a.ropeFreqBase ?? 10000),
+      '--threads',     String(threads),
+    ];
+    if (hasBias) args.push('--has-bias');
+
+    this._hiddenDim = a.hiddenSize ?? 896;
+    this._pending   = null;
+    this._buf       = Buffer.alloc(0);
+
+    this._proc = spawn(NATIVE_RUNNER_BIN, args);
+    this._proc.stderr.on('data', d => log('DEBUG', 'native-runner', { msg: d.toString().trim() }));
+    this._proc.stdout.on('data', chunk => {
+      this._buf = Buffer.concat([this._buf, chunk]);
+      this._tryComplete();
+    });
+    this._proc.on('exit', code => {
+      log('WARN', 'worker: native runner exited', { code });
+      if (this._pending) {
+        const { reject } = this._pending;
+        this._pending = null;
+        reject(new Error(`native runner exited with code ${code}`));
+      }
+    });
+    log('INFO', 'worker: native runner spawned', { layers: `${layerStart}-${layerEnd}`, bin: NATIVE_RUNNER_BIN });
+  }
+
+  _tryComplete() {
+    if (!this._pending) return;
+    const needed = 4 + this._hiddenDim * 4;
+    if (this._buf.length < needed) return;
+    const outLen = this._buf.readUInt32LE(0);
+    const { resolve, reject } = this._pending;
+    this._pending = null;
+    if (outLen !== this._hiddenDim) {
+      this._buf = this._buf.slice(needed);
+      reject(new Error(`native runner output size mismatch: ${outLen} != ${this._hiddenDim}`));
+      return;
+    }
+    // Copy output before advancing buffer (avoid stale ref)
+    const result = new Float32Array(this._hiddenDim);
+    this._buf.copy(Buffer.from(result.buffer), 0, 4, needed);
+    this._buf = this._buf.slice(needed);
+    resolve(result);
+  }
+
+  forward(hidden, pos) {
+    return new Promise((resolve, reject) => {
+      if (this._pending) return reject(new Error('native runner busy'));
+      this._pending = { resolve, reject };
+      const header = Buffer.allocUnsafe(8);
+      header.writeUInt32LE(pos,          0);
+      header.writeUInt32LE(hidden.length, 4);
+      const hidBuf = Buffer.from(hidden.buffer, hidden.byteOffset, hidden.byteLength);
+      this._proc.stdin.write(header);
+      this._proc.stdin.write(hidBuf);
+    });
+  }
+
+  destroy() {
+    try { if (this._proc) this._proc.kill('SIGTERM'); } catch {}
+    this._proc = null;
+  }
+}
+
+function _tryInitNative() {
+  if (_nativeRunner || !NATIVE_RUNNER_BIN || !_assignment) return;
+  const shardPath = _shardCachePath();
+  if (!fs.existsSync(shardPath)) return;
+  const a = _assignment.arch ?? {};
+  try {
+    _nativeRunner = new NativeRunner(
+      shardPath, a, _assignment.layerStart, _assignment.layerEnd,
+      _assignment.modelType ?? 'qwen2',
+    );
+  } catch (err) {
+    log('WARN', 'worker: native runner spawn failed', { error: err.message });
+  }
+}
+
 function _saveState() {
   const state = {
     running:    true,
-    port:       workerPort,
+    wsUrl:      coordinatorUrl,
     assignment: _assignment,
     ramMb:      Math.floor(os.freemem() / (1024 * 1024)),
     uptimeSec:  Math.floor(process.uptime()),
@@ -223,11 +287,34 @@ const SHARD_CACHE_DIR = path.join(__dirname, 'data', 'shard_cache');
 fs.mkdirSync(SHARD_CACHE_DIR, { recursive: true });
 
 let _shardLoaded  = false;
-let _shardTensors = null; // Array of { name, ggmlType, dimensions, data } when loaded
+let _shardTensors = null;
 
 function _shardCachePath() {
   const id = _identity?.nodeId?.slice(0, 12) ?? 'unknown';
-  return path.join(SHARD_CACHE_DIR, `shard-${id}-p${workerPort}.bin`);
+  return path.join(SHARD_CACHE_DIR, `shard-${id}.bin`);
+}
+
+function _parseShard(buf) {
+  const numTensors = buf.readUInt32LE(0);
+  let   off        = 4;
+  const tensors    = [];
+  for (let i = 0; i < numTensors; i++) {
+    if (off + 2 > buf.length) throw new Error(`shard parse overrun at tensor ${i} (nameLen)`);
+    const nameLen  = buf.readUInt16LE(off);                     off += 2;
+    if (off + nameLen + 8 > buf.length) throw new Error(`shard parse overrun at tensor ${i} (name)`);
+    const name     = buf.slice(off, off + nameLen).toString();  off += nameLen;
+    const ggmlType = buf.readUInt32LE(off);                     off += 4;
+    const ndim     = buf.readUInt32LE(off);                     off += 4;
+    if (off + ndim * 4 > buf.length) throw new Error(`shard parse overrun at tensor ${i} (dims)`);
+    const dims     = [];
+    for (let d = 0; d < ndim; d++) { dims.push(buf.readUInt32LE(off)); off += 4; }
+    if (off + 4 > buf.length) throw new Error(`shard parse overrun at tensor ${i} (dataLen)`);
+    const dataLen  = buf.readUInt32LE(off);                     off += 4;
+    if (off + dataLen > buf.length) throw new Error(`shard parse overrun at tensor ${i} (data)`);
+    const data     = buf.slice(off, off + dataLen);             off += dataLen;
+    tensors.push({ name, ggmlType, dimensions: dims, data });
+  }
+  return tensors;
 }
 
 function _loadCachedShard() {
@@ -238,6 +325,8 @@ function _loadCachedShard() {
     _shardTensors = _parseShard(buf);
     _shardLoaded  = true;
     _tryInitQwen2();
+    _tryInitNative();
+    if (_nativeRunner && _qwen2) { _qwen2 = null; }
     log('INFO', 'worker: shard loaded from cache', {
       tensors: _shardTensors.length,
       bytes:   buf.length,
@@ -250,255 +339,12 @@ function _loadCachedShard() {
   }
 }
 
-// Inline shard parser (mirrors gguf-extractor parseShard)
-function _parseShard(buf) {
-  const numTensors = buf.readUInt32LE(0);
-  let   off        = 4;
-  const tensors    = [];
-  for (let i = 0; i < numTensors; i++) {
-    const nameLen  = buf.readUInt16LE(off);                     off += 2;
-    const name     = buf.slice(off, off + nameLen).toString();  off += nameLen;
-    const ggmlType = buf.readUInt32LE(off);                     off += 4;
-    const ndim     = buf.readUInt32LE(off);                     off += 4;
-    const dims     = [];
-    for (let d = 0; d < ndim; d++) { dims.push(buf.readUInt32LE(off)); off += 4; }
-    const dataLen  = buf.readUInt32LE(off);                     off += 4;
-    const data     = buf.slice(off, off + dataLen);             off += dataLen;
-    tensors.push({ name, ggmlType, dimensions: dims, data });
-  }
-  return tensors;
-}
+// ── Identity ──────────────────────────────────────────────────────────────────
+const IDENTITY_FILE = path.join(__dirname, 'data', 'identity-worker.json');
 
-// ── HTTP server for weight streaming ─────────────────────────────────────────
-// Listens at workerPort + 1000 for shard delivery from the coordinator.
-// This is separate from the TCP tensor pipeline server.
-//
-// When no clusterKey is configured, bind to 127.0.0.1 only — a remote coordinator
-// without a shared secret could otherwise inject arbitrary model weights.
-
-function _checkClusterKey(req, res) {
-  const provided = req.headers['x-cluster-key'] ?? '';
-  if (!clusterKey) return true; // no key = loopback-only bind, so TCP peer is already local
-  try {
-    const ka = Buffer.from(clusterKey, 'utf8');
-    const kb = Buffer.from(provided,   'utf8');
-    if (ka.length === kb.length && crypto.timingSafeEqual(ka, kb)) return true;
-  } catch {}
-  res.writeHead(403, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ ok: false, error: 'Invalid cluster key' }));
-  return false;
-}
-
-const httpWorkerPort = workerPort + 1000;
-// When no clusterKey is set, bind weight-delivery server to loopback only.
-// A clusterKey is required to accept weight delivery from a remote coordinator.
-const httpBindAddr   = clusterKey ? '0.0.0.0' : '127.0.0.1';
-
-const httpServer     = http.createServer((req, res) => {
-  if (req.method === 'POST' && req.url === '/weights') {
-    if (!_checkClusterKey(req, res)) return;
-    const chunks = [];
-    req.on('data', c => chunks.push(c));
-    req.on('end', () => {
-      try {
-        const body     = Buffer.concat(chunks);
-        // 4-byte LE length prefix + JSON metadata + shard
-        const metaLen  = body.readUInt32LE(0);
-        const metaStr  = body.slice(4, 4 + metaLen).toString('utf8');
-        const meta     = JSON.parse(metaStr);
-        const shardBuf = body.slice(4 + metaLen);
-
-        const parsed = _parseShard(shardBuf);
-        _shardTensors = parsed;
-        _shardLoaded  = true;
-        _tryInitQwen2();
-
-        // Cache to disk
-        try {
-          fs.writeFileSync(_shardCachePath(), shardBuf);
-        } catch (err) {
-          log('WARN', 'worker: shard cache write failed', { error: err.message });
-        }
-
-        // Update state with confirmed assignment
-        if (meta.layerStart !== undefined) {
-          _assignment = {
-            layerStart:  meta.layerStart,
-            layerEnd:    meta.layerEnd,
-            totalLayers: meta.totalLayers ?? 24,
-          };
-          _saveState();
-        }
-
-        log('INFO', 'worker: shard received', {
-          tensors:    _shardTensors.length,
-          bytes:      shardBuf.length,
-          layers:     `${meta.layerStart}–${meta.layerEnd}`,
-        });
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, tensors: _shardTensors.length }));
-      } catch (err) {
-        log('ERROR', 'worker: shard parse failed', { error: err.message });
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err.message }));
-      }
-    });
-    return;
-  }
-
-  if (req.method === 'GET' && req.url === '/status') {
-    if (!_checkClusterKey(req, res)) return;
-    // Compute actual layer range from shard tensor names
-    const blkLayers = (_shardTensors ?? [])
-      .map(t => { const m = (t.name ?? '').match(/^blk\.(\d+)\./); return m ? parseInt(m[1]) : -1; })
-      .filter(n => n >= 0);
-    const shardLayerStart = blkLayers.length ? Math.min(...blkLayers) : -1;
-    const shardLayerEnd   = blkLayers.length ? Math.max(...blkLayers) : -1;
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      nodeId:          _identity?.nodeId ?? 'unknown',
-      workerPort,
-      assignment:      _assignment,
-      shardLoaded:     _shardLoaded,
-      shardTensors:    _shardTensors?.length ?? 0,
-      shardLayerStart,
-      shardLayerEnd,
-      qwen2Active:     _qwen2 !== null,
-      ramMb:           Math.floor(os.freemem() / (1024 * 1024)),
-    }));
-    return;
-  }
-
-  res.writeHead(404);
-  res.end('Not found');
-});
-
-httpServer.listen(httpWorkerPort, httpBindAddr, () => {
-  log('INFO', 'worker: HTTP server ready', { port: httpWorkerPort, bind: httpBindAddr });
-  if (!clusterKey) {
-    log('WARN', 'worker: no clusterKey configured — weight delivery bound to loopback only; set clusterKey in config/worker.json to accept from remote coordinator');
-  }
-});
-
-// ── Start TCP listener ─────────────────────────────────────────────────────────
-log('INFO', 'worker: starting TCP server', { port: workerPort });
-
-_server = net.createServer(handleCoordinator);
-_server.listen(workerPort, '0.0.0.0', () => {
-  log('INFO', 'worker: ready for coordinator', { port: workerPort });
-});
-_server.on('error', err => log('ERROR', 'worker: server error', { error: err.message }));
-
-// ── Handle coordinator connection ─────────────────────────────────────────────
-function handleCoordinator(socket) {
-  const remote = `${socket.remoteAddress}:${socket.remotePort}`;
-  log('INFO', 'worker: coordinator connected', { remote });
-  socket.setKeepAlive(true, 5000);
-
-  let state = 'auth';
-
-  const parser = new FrameParser(({ msgType, seqId, sessionId, payload }) => {
-    // Auth challenge
-    if (msgType === MSG.AUTH_CHALLENGE && state === 'auth') {
-      try {
-        const { nonce } = JSON.parse(payload.toString('utf8'));
-        const hmac = clusterKey
-          ? crypto.createHmac('sha256', clusterKey).update(nonce).digest('hex')
-          : '';
-        const ramMb = Math.floor(os.freemem() / (1024 * 1024));
-        const resp  = Buffer.from(JSON.stringify({ hmac, ramMb }), 'utf8');
-        socket.write(encode(MSG.LAYER_ACK, resp, ++_seqId));
-        state = 'assigned';
-      } catch (err) {
-        log('WARN', 'worker: auth parse failed', { error: err.message });
-        socket.destroy();
-      }
-      return;
-    }
-
-    // Layer assignment
-    if (msgType === MSG.LAYER_ASSIGN && state === 'assigned') {
-      try {
-        _assignment = JSON.parse(payload.toString('utf8'));
-        log('INFO', 'worker: layers assigned', {
-          start: _assignment.layerStart,
-          end:   _assignment.layerEnd,
-          total: _assignment.totalLayers,
-        });
-        _tryInitQwen2();
-        socket.write(encodeLayerAck(++_seqId, sessionId));
-        state = 'ready';
-        _saveState();
-      } catch (err) {
-        log('WARN', 'worker: assignment parse failed', { error: err.message });
-      }
-      return;
-    }
-
-    // Ping
-    if (msgType === MSG.PING) {
-      socket.write(encodePong(seqId));
-      return;
-    }
-
-    // Tensor forward pass
-    if (msgType === MSG.TENSOR_FWD && state === 'ready') {
-      // First 4 bytes = position index (LE uint32)
-      const pos = payload.readUInt32LE(0);
-      const { dtype, shape, data } = decodeTensor(payload.slice(4));
-      log('DEBUG', 'worker: tensor received', { shape, pos, bytes: data.length, sessionId });
-
-      if (_qwen2) {
-        try {
-          const hidden = new Float32Array(data.buffer, data.byteOffset, data.byteLength / 4);
-          const result = _qwen2.forward(hidden, pos);
-          const retBuf = Buffer.from(result.buffer, result.byteOffset, result.byteLength);
-          socket.write(encodeTensorRet(retBuf, shape, 0 /* f32 */, seqId, sessionId));
-        } catch (err) {
-          log('WARN', 'worker: forward pass error', { error: err.message });
-          socket.write(encodeTensorRet(data, shape, dtype, seqId, sessionId));
-        }
-      } else {
-        // Fallback: passthrough until Qwen2Worker is ready
-        socket.write(encodeTensorRet(data, shape, dtype, seqId, sessionId));
-      }
-      return;
-    }
-  });
-
-  socket.on('data', chunk => parser.push(chunk));
-  socket.on('error', err => log('WARN', 'worker: socket error', { error: err.message }));
-  socket.on('close', () => {
-    log('INFO', 'worker: coordinator disconnected');
-    _assignment = null;
-    state       = 'auth';
-    _saveState();
-  });
-}
-
-// ── Registration ───────────────────────────────────────────────────────────────
-// Workers register with BOTH:
-//   1. The coordinator's /v1/workers/register (primary — direct HTTP registry)
-//   2. The Circuit bootstrap server (secondary — public mesh discovery)
-
-const COORDINATOR_API = cfg.coordinatorApi
-  ?? process.env.COORDINATOR_API
-  ?? `http://${coordinatorHost}:${parseInt(process.env.LLM_PORT ?? cfg.llmPort ?? '19200', 10)}`;
-const BOOTSTRAP       = cfg.bootstrapUrl ?? process.env.BOOTSTRAP_URL ?? 'http://node.circuitllm.xyz:18500';
-// Each worker gets its own identity keyed to its port so multiple workers on
-// the same machine have distinct nodeIds (and appear as separate entries in
-// the registry). Workers on different machines use the machine's shared identity.
-const IDENTITY_FILE   = path.join(__dirname, 'data', `identity-worker-${workerPort}.json`);
-
-// Wallet address (optional — from config or environment)
-const WALLET_ADDRESS  = cfg.walletAddress ?? process.env.SOLANA_WALLET_ADDRESS ?? null;
-
-// Load or generate identity
 try {
   _identity = JSON.parse(fs.readFileSync(IDENTITY_FILE, 'utf8'));
 } catch {
-  // Generate a new identity for this worker
   const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519', {
     publicKeyEncoding:  { type: 'spki',  format: 'der' },
     privateKeyEncoding: { type: 'pkcs8', format: 'der' },
@@ -515,60 +361,15 @@ try {
   } catch {}
 }
 
-// ── Register with coordinator HTTP registry ───────────────────────────────────
-function _registerWithCoordinator() {
-  const body = JSON.stringify({
-    nodeId:        _identity.nodeId,
-    host:          workerHost || (coordinatorHost === 'localhost' ? '127.0.0.1' : os.hostname()),
-    workerPort,
-    walletAddress: WALLET_ADDRESS,
-    ramMb:         Math.floor(os.freemem() / (1024 * 1024)),
-    gpuVramMb:     0,
-    region:        cfg.region ?? 'us-east',
-    capabilities:  ['llm-worker'],
-  });
+// ── Bootstrap announce (secondary mesh discovery) ─────────────────────────────
+const BOOTSTRAP = cfg.bootstrapUrl ?? process.env.BOOTSTRAP_URL ?? 'http://node.circuitllm.xyz:18500';
 
-  _httpPost(COORDINATOR_API + '/v1/workers/register', body, res => {
-    if (res.status === 200) {
-      const data = JSON.parse(res.body);
-      log('INFO', 'worker: registered with coordinator', {
-        layers:  data.worker?.layerStart >= 0
-          ? `${data.worker.layerStart}–${data.worker.layerEnd}`
-          : 'pending',
-        message: data.message,
-      });
-      // Update state with layer assignment from coordinator
-      if (data.worker?.layerStart >= 0) {
-        _assignment = {
-          layerStart:  data.worker.layerStart,
-          layerEnd:    data.worker.layerEnd,
-          totalLayers: data.layerCount,
-        };
-        _saveState();
-      }
-    } else {
-      log('DEBUG', 'worker: coordinator register failed', { status: res.status });
-    }
-  });
-}
-
-// ── Heartbeat to coordinator ──────────────────────────────────────────────────
-function _heartbeatCoordinator() {
-  const body = JSON.stringify({
-    nodeId: _identity.nodeId,
-    ramMb:  Math.floor(os.freemem() / (1024 * 1024)),
-  });
-  _httpPost(COORDINATOR_API + '/v1/workers/heartbeat', body, () => {});
-}
-
-// ── Announce to bootstrap (secondary discovery) ───────────────────────────────
 function _announceBootstrap() {
   const body = JSON.stringify({
     nodeId:       _identity.nodeId,
-    version:      '0.1.0',
+    version:      '0.2.0',
     region:       cfg.region ?? 'us-east',
     capabilities: ['llm-worker'],
-    workerPort,
     ramMb:        Math.floor(os.freemem() / (1024 * 1024)),
     timestamp:    Date.now(),
   });
@@ -592,60 +393,230 @@ function _announceBootstrap() {
   req.end();
 }
 
-// ── Generic HTTP POST helper ──────────────────────────────────────────────────
-function _httpPost(url, body, cb, extraHeaders = {}) {
-  try {
-    const parsed  = new URL(url);
-    const lib     = parsed.protocol === 'https:' ? https : http;
-    const headers = { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), ...extraHeaders };
-    if (clusterKey) headers['X-Cluster-Key'] = clusterKey;
-    const req = lib.request({
-      hostname: parsed.hostname,
-      port:     parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
-      path:     parsed.pathname,
-      method:   'POST',
-      headers,
-    }, res => {
-      let data = '';
-      res.on('data', c => { data += c; });
-      res.on('end', () => cb({ status: res.statusCode, body: data }));
-    });
-    req.on('error', () => cb({ status: 0, body: '' }));
-    req.setTimeout(5000, () => req.destroy());
-    req.write(body);
-    req.end();
-  } catch { cb({ status: 0, body: '' }); }
+// ── HELLO frame ───────────────────────────────────────────────────────────────
+function _sendHello(ws) {
+  const ts   = Date.now();
+  const hmac = clusterKey
+    ? crypto.createHmac('sha256', clusterKey).update(_identity.nodeId + ':' + ts).digest('hex')
+    : '';
+  const payload = Buffer.from(JSON.stringify({
+    nodeId:       _identity.nodeId,
+    ramMb:        Math.floor(os.freemem() / (1024 * 1024)),
+    gpuVramMb:    0,
+    walletAddress,
+    version:      '0.2.0',
+    ts,
+    hmac,
+  }), 'utf8');
+  ws.send(encode(MSG.HELLO, payload, ++_seqId));
 }
 
-// ── Load cached shard from previous run (requires _identity to be set) ────────
+// ── Handle inbound frames ─────────────────────────────────────────────────────
+function _handleFrame(ws, data) {
+  const buf       = Buffer.isBuffer(data) ? data : Buffer.from(data);
+  const magic     = buf.readUInt32LE(0);
+  if (magic !== MAGIC) return;
+  const msgType    = buf.readUInt32LE(4);
+  const seqIdIn    = buf.readUInt32LE(8);
+  const sessionId  = buf.readUInt32LE(12);
+  const payLen     = buf.readUInt32LE(16);
+  const storedCsum = buf.readUInt32LE(20);
+  const payload    = buf.slice(HEADER_LEN, HEADER_LEN + payLen);
+  if (djb2(payload) !== storedCsum) {
+    log('WARN', 'worker: checksum mismatch, dropping frame', { msgType, payLen });
+    return;
+  }
+
+  if (msgType === MSG.LAYER_ASSIGN) {
+    try {
+      const newAssign = JSON.parse(payload.toString('utf8'));
+      log('INFO', 'worker: layers assigned', {
+        start:     newAssign.layerStart,
+        end:       newAssign.layerEnd,
+        total:     newAssign.totalLayers,
+        modelType: newAssign.modelType ?? 'qwen2',
+      });
+
+      // Clear stale shard/weights from a previous assignment — the coordinator
+      // will push a fresh shard after this. We do NOT send LAYER_ACK here;
+      // it's sent from the WEIGHT_SHARD handler once a compute backend is ready.
+      _qwen2        = null;
+      if (_nativeRunner) { _nativeRunner.destroy(); _nativeRunner = null; }
+      _shardTensors = null;
+      _shardLoaded  = false;
+      _assignment   = newAssign;
+
+      // If no layers assigned (passthrough node), ACK immediately — no shard coming.
+      if (newAssign.layerEnd < newAssign.layerStart) {
+        ws.send(encodeLayerAck(++_seqId, sessionId));
+      }
+      _saveState();
+    } catch (err) {
+      log('WARN', 'worker: assignment parse failed', { error: err.message });
+    }
+    return;
+  }
+
+  if (msgType === MSG.WEIGHT_SHARD) {
+    try {
+      const metaLen  = payload.readUInt32LE(0);
+      const metaStr  = payload.slice(4, 4 + metaLen).toString('utf8');
+      const meta     = JSON.parse(metaStr);
+      const shardBuf = payload.slice(4 + metaLen);
+
+      // Reject shard if its layer range doesn't match the assignment we received.
+      if (_assignment && meta.layerStart !== undefined) {
+        if (meta.layerStart !== _assignment.layerStart || meta.layerEnd !== _assignment.layerEnd) {
+          const msg = `assigned ${_assignment.layerStart}-${_assignment.layerEnd}, got shard ${meta.layerStart}-${meta.layerEnd}`;
+          log('WARN', 'worker: shard layer range mismatch, rejecting', { detail: msg });
+          ws.send(encodeError('SHARD_MISMATCH', msg, ++_seqId, sessionId));
+          return;
+        }
+      }
+
+      const parsed = _parseShard(shardBuf);
+      _shardTensors = parsed;
+      _shardLoaded  = true;
+
+      if (meta.layerStart !== undefined) {
+        _assignment = {
+          ..._assignment,
+          layerStart:  meta.layerStart,
+          layerEnd:    meta.layerEnd,
+          totalLayers: meta.totalLayers ?? 24,
+        };
+      }
+
+      // Tear down old native runner before re-initializing
+      if (_nativeRunner) { _nativeRunner.destroy(); _nativeRunner = null; }
+
+      _tryInitQwen2();
+
+      try {
+        const tmp = _shardCachePath() + '.tmp';
+        fs.writeFileSync(tmp, shardBuf);
+        fs.renameSync(tmp, _shardCachePath());
+      } catch (err) { log('WARN', 'worker: shard cache write failed', { error: err.message }); }
+
+      // Try native runner after writing shard to disk (it reads from disk).
+      // If native succeeds, release the JS worker — it's unused and holds raw tensor refs.
+      _tryInitNative();
+      if (_nativeRunner && _qwen2) { _qwen2 = null; }
+
+      log('INFO', 'worker: shard received', {
+        tensors: _shardTensors.length,
+        bytes:   shardBuf.length,
+        layers:  `${meta.layerStart}–${meta.layerEnd}`,
+        backend: _nativeRunner ? 'native' : 'js',
+      });
+
+      // ACK if native runner OR JS worker initialized; otherwise report failure.
+      if (_nativeRunner || _qwen2) {
+        ws.send(encodeLayerAck(++_seqId, sessionId));
+      } else {
+        ws.send(encodeError('INIT_FAILED', 'No compute backend initialized after shard load', ++_seqId, sessionId));
+      }
+      _saveState();
+    } catch (err) {
+      log('WARN', 'worker: shard parse failed', { error: err.message });
+    }
+    return;
+  }
+
+  if (msgType === MSG.PING) {
+    ws.send(encodePong(seqIdIn));
+    return;
+  }
+
+  if (msgType === MSG.TENSOR_FWD) {
+    const pos = payload.readUInt32LE(0);
+    const { dtype, shape, data } = decodeTensor(payload.slice(4));
+    log('DEBUG', 'worker: tensor received', { shape, pos, bytes: data.length, sessionId });
+
+    const expectedLen = _assignment?.arch?.hiddenSize ?? 896;
+    const actualLen   = data.byteLength / 4;
+    if (actualLen !== expectedLen) {
+      log('WARN', 'worker: tensor shape mismatch', { expected: expectedLen, got: actualLen });
+      ws.send(encodeError('SHAPE_MISMATCH', `expected ${expectedLen} elements, got ${actualLen}`, seqIdIn, sessionId));
+      return;
+    }
+
+    if (!_nativeRunner && !_qwen2) {
+      log('WARN', 'worker: tensor received but no compute backend ready');
+      ws.send(encodeError('NOT_READY', 'No compute backend loaded', seqIdIn, sessionId));
+      return;
+    }
+
+    const hidden = new Float32Array(data.buffer, data.byteOffset, data.byteLength / 4);
+
+    // Native runner path (async subprocess IPC)
+    if (_nativeRunner) {
+      _nativeRunner.forward(hidden, pos).then(result => {
+        const retBuf = Buffer.from(result.buffer, result.byteOffset, result.byteLength);
+        ws.send(encodeTensorRet(retBuf, shape, 0 /* f32 */, seqIdIn, sessionId));
+      }).catch(err => {
+        log('WARN', 'worker: native runner forward error', { error: err.message });
+        ws.send(encodeError('FORWARD_ERROR', err.message, seqIdIn, sessionId));
+      });
+      return;
+    }
+
+    // JS fallback path (synchronous)
+    try {
+      if (pos === 0) _qwen2.resetKv();
+      const result = _qwen2.forward(hidden, pos);
+      const retBuf = Buffer.from(result.buffer, result.byteOffset, result.byteLength);
+      ws.send(encodeTensorRet(retBuf, shape, 0 /* f32 */, seqIdIn, sessionId));
+    } catch (err) {
+      log('WARN', 'worker: forward pass error', { error: err.message });
+      ws.send(encodeError('FORWARD_ERROR', err.message, seqIdIn, sessionId));
+    }
+    return;
+  }
+}
+
+// ── WebSocket connect with backoff ────────────────────────────────────────────
+function _connect() {
+  if (_ws && (_ws.readyState === WebSocket.OPEN || _ws.readyState === WebSocket.CONNECTING)) {
+    log('WARN', 'worker: already connected, skipping reconnect');
+    return;
+  }
+  const ws = new WebSocket(coordinatorUrl);
+  _ws = ws;
+
+  ws.on('open', () => {
+    _reconnectDelay = 2_000;
+    log('INFO', 'worker: connected to coordinator', { url: coordinatorUrl });
+    _sendHello(ws);
+  });
+
+  ws.on('message', (data, isBinary) => { if (isBinary) _handleFrame(ws, data); });
+
+  ws.on('close', (code) => {
+    _ws = null; _assignment = null;
+    if (_nativeRunner) { _nativeRunner.destroy(); _nativeRunner = null; }
+    _saveState();
+    log('INFO', 'worker: disconnected', { code, reconnectMs: Math.round(_reconnectDelay) });
+    _reconnectDelay = Math.min(_reconnectDelay * 1.5, 60_000);
+    _reconnectTimer = setTimeout(_connect, _reconnectDelay);
+  });
+
+  ws.on('error', err => log('WARN', 'worker: error', { error: err.message }));
+}
+
+// ── Startup ───────────────────────────────────────────────────────────────────
 _loadCachedShard();
-
-// ── Start registration loops ──────────────────────────────────────────────────
-// Initial attempt — coordinator may still be loading the model, so retry once
-// after 10s in case the first attempt is refused.
-_registerWithCoordinator();
+_connect();
 _announceBootstrap();
-setTimeout(_registerWithCoordinator, 10_000);
-
-// Coordinator heartbeat every 30s; bootstrap every 60s
-setInterval(_heartbeatCoordinator, 30_000).unref();
-setInterval(_announceBootstrap,     60_000).unref();
-// Re-register every 5min in case coordinator restarted
-setInterval(_registerWithCoordinator, 5 * 60_000).unref();
+setInterval(_announceBootstrap, 60_000).unref();
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
 function shutdown() {
   log('INFO', 'worker: shutting down');
-  if (_server) _server.close();
-  if (httpServer) httpServer.close();
-  // Deregister from coordinator
-  const body = JSON.stringify({ nodeId: _identity?.nodeId });
-  _httpPost(COORDINATOR_API + '/v1/workers/deregister', body, () => {});
-  try {
-    fs.writeFileSync(stateFile, JSON.stringify({ running: false }), 'utf8');
-  } catch {}
+  if (_reconnectTimer) clearTimeout(_reconnectTimer);
+  if (_ws) { try { _ws.close(); } catch {} _ws = null; }
+  try { fs.writeFileSync(stateFile, JSON.stringify({ running: false }), 'utf8'); } catch {}
   setTimeout(() => process.exit(0), 500);
 }
-
 process.on('SIGTERM', shutdown);
 process.on('SIGINT',  shutdown);
