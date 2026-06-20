@@ -32,3 +32,4 @@ native/cuda-libs/
 # OS
 .DS_Store
 Thumbs.db
+data/identity-worker*.json
