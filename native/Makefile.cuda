@@ -1,0 +1,54 @@
+# Makefile.cuda — build circuit-runner-cuda on RunPod with CUDA support
+#
+# Prerequisites (all present on RunPod after node-llama-cpp install):
+#   /tmp/llama-cpp-src/ggml/include/   — ggml headers (ggml.h, ggml-backend.h, ggml-alloc.h)
+#   $(GGML_CUDA_BINS)/libggml-cuda.so  — CUDA backend from node-llama-cpp cuda-ext package
+#   $(GGML_CUDA_BINS)/libggml-base.so  — ggml base library
+#
+# Usage (on RunPod):
+#   make -f Makefile.cuda
+#   # produces: circuit-runner-cuda
+
+# GGML_CUDA_BINS: dir holding CUDA-12-built ggml libs (libggml-base/cpu/cuda.so).
+# The node-llama-cpp prebuilt bins are CUDA 13 (incompatible with the pod's CUDA
+# 12.8), so we build ggml from source and stage the libs here (persists on the
+# /workspace network volume across pod restarts).
+GGML_CUDA_BINS := /workspace/circuit-node-client/native/cuda-libs
+GGML_INCL      := /tmp/llama-cpp-src/ggml/include
+# CUDA runtime libs (libcudart.so.12, libcublas.so.12) — rpath so the binary
+# resolves them without LD_LIBRARY_PATH. /usr/local/cuda symlinks to 12.8.
+CUDA_RT        := /usr/local/cuda/targets/x86_64-linux/lib
+
+CC       := gcc
+CFLAGS   := -O2 -std=c11 -Wall -Wextra -Wno-unused-parameter \
+            -I$(GGML_INCL) \
+            -DGGML_USE_CUDA
+LDFLAGS  := -L$(GGML_CUDA_BINS) \
+            -Wl,-rpath,$(GGML_CUDA_BINS) \
+            -Wl,-rpath,$(CUDA_RT) \
+            -lggml-base \
+            -lggml-cpu \
+            -lggml-cuda \
+            -lm -lpthread -ldl
+
+TARGET   := circuit-runner-cuda
+SRC      := circuit-runner.c
+
+.PHONY: all clean check-env
+
+all: check-env $(TARGET)
+
+check-env:
+	@test -d "$(GGML_CUDA_BINS)" || { echo "ERROR: CUDA bins not found at $(GGML_CUDA_BINS)"; exit 1; }
+	@test -f "$(GGML_CUDA_BINS)/libggml-cuda.so" || { echo "ERROR: libggml-cuda.so not found"; exit 1; }
+	@test -d "$(GGML_INCL)" || { echo "ERROR: ggml headers not found at $(GGML_INCL)"; exit 1; }
+	@test -f "$(GGML_INCL)/ggml-backend.h" || { echo "ERROR: ggml-backend.h not found (needed for GPU path)"; exit 1; }
+	@echo "Build environment OK"
+
+$(TARGET): $(SRC)
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+	@echo "Built: $(TARGET)"
+	@echo "CUDA libs expected at runtime: $(GGML_CUDA_BINS)"
+
+clean:
+	rm -f $(TARGET)

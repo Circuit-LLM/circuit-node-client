@@ -6,15 +6,38 @@ const os        = require('os');
 const http      = require('http');
 const https     = require('https');
 const crypto    = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const WebSocket = require('ws');
 
-// Native runner binary — local `native/` dir first, then central install
-const NATIVE_RUNNER_PATHS = [
+// Native runner binaries — CUDA version preferred for GPU workers
+function _findBin(paths) {
+  return paths.find(p => { try { fs.accessSync(p, fs.constants.X_OK); return true; } catch { return false; } }) ?? null;
+}
+
+const CUDA_RUNNER_BIN = _findBin([
+  path.join(__dirname, 'native', 'circuit-runner-cuda'),
+  '/workspace/circuit-node-client/native/circuit-runner-cuda',
+]);
+
+const CPU_RUNNER_BIN = _findBin([
   path.join(__dirname, 'native', 'circuit-runner'),
   '/home/watchtower/circuit-node-client/native/circuit-runner',
-];
-const NATIVE_RUNNER_BIN = NATIVE_RUNNER_PATHS.find(p => { try { fs.accessSync(p, fs.constants.X_OK); return true; } catch { return false; } }) ?? null;
+  '/workspace/circuit-node-client/native/circuit-runner',
+]);
+
+// "Is any native runner available" — used to gate _tryInitNative(). The actual
+// binary (CPU vs CUDA) is chosen inside NativeRunner based on gpuLayers.
+const NATIVE_RUNNER_BIN = CUDA_RUNNER_BIN || CPU_RUNNER_BIN;
+
+// Detect GPU VRAM once at startup (used in HELLO message to coordinator)
+const _gpuVramMb = (() => {
+  try {
+    const out = execFileSync('nvidia-smi',
+      ['--query-gpu=memory.total', '--format=csv,noheader,nounits'],
+      { timeout: 2000, encoding: 'utf8' });
+    return parseInt(out.trim(), 10) || 0;
+  } catch { return 0; }
+})();
 
 function log(level, msg, data) {
   const ts   = new Date().toISOString();
@@ -141,6 +164,15 @@ let _reconnectTimer = null;
 const stateFile     = path.join(__dirname, 'data', 'worker_state.json');
 const PEER_RANGE    = 15_000;
 
+// JS fallback single-session guard (see TENSOR_FWD handler). null = idle.
+let _jsActiveSession = null;
+let _jsActiveAt      = 0;
+const JS_SESSION_IDLE_MS = 120_000;
+
+// Native runner watchdog: kill+recover a subprocess whose head request stalls
+// past this (well above the coordinator's 30s tensor timeout).
+const NATIVE_WATCHDOG_MS = 120_000;
+
 function _tryInitQwen2() {
   if (_qwen2 || !Qwen2Worker || !_shardTensors) return;
   const a = (_assignment && _assignment.arch) ? _assignment.arch : {};
@@ -174,9 +206,23 @@ function _tryInitQwen2() {
 // ── Native runner subprocess wrapper ──────────────────────────────────────────
 class NativeRunner {
   constructor(shardPath, a, layerStart, layerEnd, modelType) {
-    const headDim = Math.floor((a.hiddenSize ?? 896) / (a.numHeads ?? 14));
-    const hasBias = !['llama3', 'llama-3'].includes(modelType ?? '');
-    const threads  = Math.max(1, Math.min(os.cpus().length, 4));
+    const headDim   = Math.floor((a.hiddenSize ?? 896) / (a.numHeads ?? 14));
+    const hasBias   = !['llama3', 'llama-3'].includes(modelType ?? '');
+    const gpuLayers = cfg.gpuLayers ?? 0;
+    const cudaDev   = cfg.cudaDevice ?? 0;
+
+    // Thread budget for the native runner.
+    //  - GPU worker: matmuls run on the GPU, so 2 CPU threads is plenty.
+    //  - CPU node clients: they hold only a SMALL shard (1-2 layers) and are
+    //    co-located with other services on a shared box; the pipeline is
+    //    sequential (one worker computes at a time per request), so default to
+    //    1 thread to avoid oversubscribing the host. Override via cfg.threads.
+    const threads = gpuLayers > 0 ? 2 : (cfg.threads ?? 2);
+
+    // Pick binary: CUDA runner when gpuLayers > 0 and available, else CPU
+    const bin = (gpuLayers > 0 && CUDA_RUNNER_BIN) ? CUDA_RUNNER_BIN : CPU_RUNNER_BIN;
+    if (!bin) throw new Error('No native runner binary found (circuit-runner not built)');
+
     const args = [
       '--shard',       shardPath,
       '--hidden-dim',  String(a.hiddenSize   ?? 896),
@@ -189,12 +235,24 @@ class NativeRunner {
       '--threads',     String(threads),
     ];
     if (hasBias) args.push('--has-bias');
+    if (gpuLayers > 0) {
+      args.push('--gpu-layers', String(gpuLayers));
+      args.push('--cuda-device', String(cudaDev));
+    }
 
     this._hiddenDim = a.hiddenSize ?? 896;
-    this._pending   = null;
-    this._buf       = Buffer.alloc(0);
+    // FIFO of in-flight forward() promises. The subprocess reads tokens from stdin
+    // in order and emits responses in the same order, so responses map to queue
+    // entries head-first. A queue (vs a single _pending) keeps the stdout stream
+    // aligned if the coordinator ever has more than one tensor outstanding for this
+    // worker — e.g. after a tensor timeout + redispatch while the old token is still
+    // being computed. The stale (timed-out) response is still consumed in order and
+    // returned; the coordinator ignores it via seqId mismatch.
+    this._queue = [];
+    this._buf   = Buffer.alloc(0);
+    this._headStartedAt = 0;  // when the current head request began (0 = idle)
 
-    this._proc = spawn(NATIVE_RUNNER_BIN, args);
+    this._proc = spawn(bin, args);
     this._proc.stderr.on('data', d => log('DEBUG', 'native-runner', { msg: d.toString().trim() }));
     this._proc.stdout.on('data', chunk => {
       this._buf = Buffer.concat([this._buf, chunk]);
@@ -202,41 +260,68 @@ class NativeRunner {
     });
     this._proc.on('exit', code => {
       log('WARN', 'worker: native runner exited', { code });
-      if (this._pending) {
-        const { reject } = this._pending;
-        this._pending = null;
-        reject(new Error(`native runner exited with code ${code}`));
-      }
+      if (this._watchdog) { clearInterval(this._watchdog); this._watchdog = null; }
+      const q = this._queue;
+      this._queue = [];
+      this._headStartedAt = 0;
+      for (const { reject } of q) reject(new Error(`native runner exited with code ${code}`));
     });
-    log('INFO', 'worker: native runner spawned', { layers: `${layerStart}-${layerEnd}`, bin: NATIVE_RUNNER_BIN });
+
+    // Watchdog: if the head request hasn't completed within WATCHDOG_MS (well above
+    // the coordinator's 30s tensor timeout), the subprocess is wedged. Kill it — the
+    // exit handler rejects all queued forwards and PM2 / shard re-push recovers.
+    this._watchdog = setInterval(() => {
+      if (this._queue.length > 0 && this._headStartedAt > 0
+          && Date.now() - this._headStartedAt > NATIVE_WATCHDOG_MS) {
+        log('WARN', 'worker: native runner wedged, killing subprocess', {
+          queued: this._queue.length, stuckMs: Date.now() - this._headStartedAt,
+        });
+        try { this._proc.kill('SIGKILL'); } catch {}
+      }
+    }, 30_000);
+    this._watchdog.unref();
+    log('INFO', 'worker: native runner spawned', { layers: `${layerStart}-${layerEnd}`, bin, gpuLayers });
   }
 
   _tryComplete() {
-    if (!this._pending) return;
     const needed = 4 + this._hiddenDim * 4;
-    if (this._buf.length < needed) return;
-    const outLen = this._buf.readUInt32LE(0);
-    const { resolve, reject } = this._pending;
-    this._pending = null;
-    if (outLen !== this._hiddenDim) {
+    // Drain every complete response frame currently buffered, mapping each to the
+    // head of the FIFO queue (responses arrive in the same order tokens were sent).
+    while (this._queue.length > 0 && this._buf.length >= needed) {
+      const outLen = this._buf.readUInt32LE(0);
+      const { resolve, reject } = this._queue.shift();
+      if (outLen !== this._hiddenDim) {
+        // out_len != hiddenDim is the subprocess's error sentinel (e.g. a
+        // continuation token whose KV cache was evicted). Fail this forward cleanly.
+        this._buf = this._buf.slice(needed);
+        reject(new Error(`native runner output size mismatch: ${outLen} != ${this._hiddenDim}`));
+        continue;
+      }
+      // Copy output before advancing buffer (avoid stale ref)
+      const result = new Float32Array(this._hiddenDim);
+      this._buf.copy(Buffer.from(result.buffer), 0, 4, needed);
       this._buf = this._buf.slice(needed);
-      reject(new Error(`native runner output size mismatch: ${outLen} != ${this._hiddenDim}`));
-      return;
+      resolve(result);
     }
-    // Copy output before advancing buffer (avoid stale ref)
-    const result = new Float32Array(this._hiddenDim);
-    this._buf.copy(Buffer.from(result.buffer), 0, 4, needed);
-    this._buf = this._buf.slice(needed);
-    resolve(result);
+    // Restart the head clock for whatever is now at the front (or idle).
+    this._headStartedAt = this._queue.length > 0 ? Date.now() : 0;
   }
 
-  forward(hidden, pos) {
+  forward(hidden, pos, sessionId = 0) {
     return new Promise((resolve, reject) => {
-      if (this._pending) return reject(new Error('native runner busy'));
-      this._pending = { resolve, reject };
-      const header = Buffer.allocUnsafe(8);
-      header.writeUInt32LE(pos,          0);
-      header.writeUInt32LE(hidden.length, 4);
+      if (!this._proc || !this._proc.stdin.writable) {
+        return reject(new Error('native runner not running'));
+      }
+      // Enqueue before writing so the response (consumed FIFO) maps to this call.
+      this._queue.push({ resolve, reject });
+      if (this._queue.length === 1) this._headStartedAt = Date.now();  // became head
+      // 12-byte header: [4B session_id][4B pos][4B hidden_len].
+      // header + hidBuf are written back-to-back synchronously, so concurrent
+      // forward() calls never interleave a header with another call's payload.
+      const header = Buffer.allocUnsafe(12);
+      header.writeUInt32LE(sessionId >>> 0,  0);
+      header.writeUInt32LE(pos,              4);
+      header.writeUInt32LE(hidden.length,    8);
       const hidBuf = Buffer.from(hidden.buffer, hidden.byteOffset, hidden.byteLength);
       this._proc.stdin.write(header);
       this._proc.stdin.write(hidBuf);
@@ -244,6 +329,7 @@ class NativeRunner {
   }
 
   destroy() {
+    if (this._watchdog) { clearInterval(this._watchdog); this._watchdog = null; }
     try { if (this._proc) this._proc.kill('SIGTERM'); } catch {}
     this._proc = null;
   }
@@ -288,6 +374,7 @@ fs.mkdirSync(SHARD_CACHE_DIR, { recursive: true });
 
 let _shardLoaded  = false;
 let _shardTensors = null;
+let _shardRx      = null;   // in-progress chunked-shard reassembly { chunks: [Buffer] }
 
 function _shardCachePath() {
   const id = _identity?.nodeId?.slice(0, 12) ?? 'unknown';
@@ -324,11 +411,15 @@ function _loadCachedShard() {
     const buf = fs.readFileSync(cachePath);
     _shardTensors = _parseShard(buf);
     _shardLoaded  = true;
+    const _nTensors = _shardTensors.length;
     _tryInitQwen2();
     _tryInitNative();
-    if (_nativeRunner && _qwen2) { _qwen2 = null; }
+    // If the native runner is up it reads weights from the on-disk shard, so the
+    // parsed shard in JS heap (which pins the whole multi-hundred-MB buffer) is
+    // dead weight — release it. Only the JS fallback needs _shardTensors.
+    if (_nativeRunner) { _qwen2 = null; _shardTensors = null; }
     log('INFO', 'worker: shard loaded from cache', {
-      tensors: _shardTensors.length,
+      tensors: _nTensors,
       bytes:   buf.length,
       path:    cachePath,
     });
@@ -402,7 +493,7 @@ function _sendHello(ws) {
   const payload = Buffer.from(JSON.stringify({
     nodeId:       _identity.nodeId,
     ramMb:        Math.floor(os.freemem() / (1024 * 1024)),
-    gpuVramMb:    0,
+    gpuVramMb:    _gpuVramMb,
     walletAddress,
     version:      '0.2.0',
     ts,
@@ -443,6 +534,7 @@ function _handleFrame(ws, data) {
       _qwen2        = null;
       if (_nativeRunner) { _nativeRunner.destroy(); _nativeRunner = null; }
       _shardTensors = null;
+      _shardRx      = null;   // drop any partial chunked shard from a prior assignment
       _shardLoaded  = false;
       _assignment   = newAssign;
 
@@ -460,19 +552,30 @@ function _handleFrame(ws, data) {
   if (msgType === MSG.WEIGHT_SHARD) {
     try {
       const metaLen  = payload.readUInt32LE(0);
-      const metaStr  = payload.slice(4, 4 + metaLen).toString('utf8');
-      const meta     = JSON.parse(metaStr);
-      const shardBuf = payload.slice(4 + metaLen);
+      const meta     = JSON.parse(payload.slice(4, 4 + metaLen).toString('utf8'));
+      const chunkBuf = payload.slice(4 + metaLen);
+      const nChunks  = meta.chunks ?? 1;   // backward-compat: no field = single frame
+      const idx      = meta.chunk  ?? 0;
 
-      // Reject shard if its layer range doesn't match the assignment we received.
-      if (_assignment && meta.layerStart !== undefined) {
-        if (meta.layerStart !== _assignment.layerStart || meta.layerEnd !== _assignment.layerEnd) {
-          const msg = `assigned ${_assignment.layerStart}-${_assignment.layerEnd}, got shard ${meta.layerStart}-${meta.layerEnd}`;
-          log('WARN', 'worker: shard layer range mismatch, rejecting', { detail: msg });
-          ws.send(encodeError('SHARD_MISMATCH', msg, ++_seqId, sessionId));
-          return;
-        }
+      // Reject shard if its layer range doesn't match our assignment (check on first chunk).
+      if (idx === 0 && _assignment && meta.layerStart !== undefined &&
+          (meta.layerStart !== _assignment.layerStart || meta.layerEnd !== _assignment.layerEnd)) {
+        const msg = `assigned ${_assignment.layerStart}-${_assignment.layerEnd}, got shard ${meta.layerStart}-${meta.layerEnd}`;
+        log('WARN', 'worker: shard layer range mismatch, rejecting', { detail: msg });
+        ws.send(encodeError('SHARD_MISMATCH', msg, ++_seqId, sessionId));
+        _shardRx = null;
+        return;
       }
+
+      // Reassemble the (possibly chunked) shard. WS rides on TCP so chunks arrive
+      // in order 0..N-1; we buffer until the last one, then concat the full shard.
+      if (idx === 0) _shardRx = { chunks: [] };
+      if (!_shardRx) { log('WARN', 'worker: shard chunk arrived without a start frame, ignoring'); return; }
+      _shardRx.chunks.push(chunkBuf);
+      if (idx < nChunks - 1) return;   // more chunks coming — wait
+      const shardBuf = _shardRx.chunks.length === 1 ? _shardRx.chunks[0] : Buffer.concat(_shardRx.chunks);
+      _shardRx = null;
+      if (nChunks > 1) log('INFO', 'worker: shard reassembled', { chunks: nChunks, mb: Math.round(shardBuf.length / 1e6) });
 
       const parsed = _parseShard(shardBuf);
       _shardTensors = parsed;
@@ -494,17 +597,31 @@ function _handleFrame(ws, data) {
 
       try {
         const tmp = _shardCachePath() + '.tmp';
-        fs.writeFileSync(tmp, shardBuf);
+        // Node's single fs write is capped at 2^31-1 bytes (~2GB); the GPU worker's
+        // shard can be >3GB, so write it in 1GB slices via a file descriptor.
+        const fd = fs.openSync(tmp, 'w');
+        try {
+          const WRITE_CHUNK = 1 << 30; // 1GB
+          for (let off = 0; off < shardBuf.length; off += WRITE_CHUNK) {
+            fs.writeSync(fd, shardBuf, off, Math.min(WRITE_CHUNK, shardBuf.length - off));
+          }
+        } finally { fs.closeSync(fd); }
         fs.renameSync(tmp, _shardCachePath());
       } catch (err) { log('WARN', 'worker: shard cache write failed', { error: err.message }); }
 
       // Try native runner after writing shard to disk (it reads from disk).
       // If native succeeds, release the JS worker — it's unused and holds raw tensor refs.
-      _tryInitNative();
-      if (_nativeRunner && _qwen2) { _qwen2 = null; }
+      // Guard so a native-init failure can never bypass the LAYER_ACK below when a
+      // JS backend is available (the native path is preferred but not required).
+      try { _tryInitNative(); } catch (err) { log('WARN', 'worker: native init threw', { error: err.message }); }
+      const _nTensors = _shardTensors ? _shardTensors.length : 0;
+      // Native runner reads weights from the on-disk shard, so the parsed shard in
+      // JS heap (which pins the whole multi-hundred-MB buffer) is dead weight once
+      // it's up — release it. Only the JS fallback path needs _shardTensors.
+      if (_nativeRunner) { _qwen2 = null; _shardTensors = null; }
 
       log('INFO', 'worker: shard received', {
-        tensors: _shardTensors.length,
+        tensors: _nTensors,
         bytes:   shardBuf.length,
         layers:  `${meta.layerStart}–${meta.layerEnd}`,
         backend: _nativeRunner ? 'native' : 'js',
@@ -551,7 +668,7 @@ function _handleFrame(ws, data) {
 
     // Native runner path (async subprocess IPC)
     if (_nativeRunner) {
-      _nativeRunner.forward(hidden, pos).then(result => {
+      _nativeRunner.forward(hidden, pos, sessionId).then(result => {
         const retBuf = Buffer.from(result.buffer, result.byteOffset, result.byteLength);
         ws.send(encodeTensorRet(retBuf, shape, 0 /* f32 */, seqIdIn, sessionId));
       }).catch(err => {
@@ -561,9 +678,27 @@ function _handleFrame(ws, data) {
       return;
     }
 
-    // JS fallback path (synchronous)
+    // JS fallback path (synchronous). The JS Qwen2Worker has a SINGLE shared KV
+    // cache — it cannot multiplex sessions. To avoid silently corrupting one
+    // session's attention state with another's, allow only ONE active session at
+    // a time and reject foreign sessions with a loud error (fail, don't corrupt).
+    // A stale claim is released after JS_SESSION_IDLE_MS so a crashed client can't
+    // wedge the worker. This path should never run in production (the native
+    // runner is preferred); it's a degraded fallback only.
+    const nowMs = Date.now();
+    if (_jsActiveSession !== null && _jsActiveSession !== sessionId
+        && (nowMs - _jsActiveAt) < JS_SESSION_IDLE_MS) {
+      log('WARN', 'worker: JS fallback busy with another session, rejecting', {
+        active: _jsActiveSession, incoming: sessionId,
+      });
+      ws.send(encodeError('JS_SINGLE_SESSION',
+        'JS fallback handles one session at a time (no native runner)', seqIdIn, sessionId));
+      return;
+    }
     try {
-      if (pos === 0) _qwen2.resetKv();
+      if (pos === 0 || _jsActiveSession !== sessionId) _qwen2.resetKv();
+      _jsActiveSession = sessionId;
+      _jsActiveAt      = nowMs;
       const result = _qwen2.forward(hidden, pos);
       const retBuf = Buffer.from(result.buffer, result.byteOffset, result.byteLength);
       ws.send(encodeTensorRet(retBuf, shape, 0 /* f32 */, seqIdIn, sessionId));
@@ -581,23 +716,44 @@ function _connect() {
     log('WARN', 'worker: already connected, skipping reconnect');
     return;
   }
-  const ws = new WebSocket(coordinatorUrl, { maxPayload: 1024 * 1024 * 1024 }); // 1GB — supports 7B model shards
+  // 3GB max frame — a heavy worker (e.g. RunPod taking ~12-18 layers of a 7B
+  // model) receives its whole weight shard in one WEIGHT_SHARD frame; 12 layers
+  // ≈ 1.8GB, so 1GB was too small and dropped the connection mid-delivery.
+  const ws = new WebSocket(coordinatorUrl, { maxPayload: 3 * 1024 * 1024 * 1024 });
   _ws = ws;
+
+  // Transport keepalive: ping the coordinator every 20s so NAT/proxies on the
+  // VPS→RunPod internet path don't cull the idle WebSocket — the cause of the
+  // intermittent code-1006 drops that fail in-flight inference. If two pings go
+  // unanswered (~40s), treat the link as dead and force a fast reconnect.
+  let _alive = true;
+  let _ka = null;
+  ws.on('pong', () => { _alive = true; });
 
   ws.on('open', () => {
     _reconnectDelay = 2_000;
     log('INFO', 'worker: connected to coordinator', { url: coordinatorUrl });
     _sendHello(ws);
+    _alive = true;
+    _ka = setInterval(() => {
+      if (!_alive) { log('WARN', 'worker: keepalive timeout, terminating link'); try { ws.terminate(); } catch {} return; }
+      _alive = false;
+      try { ws.ping(); } catch {}
+    }, 20_000);
+    _ka.unref?.();
   });
 
   ws.on('message', (data, isBinary) => { if (isBinary) _handleFrame(ws, data); });
 
   ws.on('close', (code) => {
+    if (_ka) { clearInterval(_ka); _ka = null; }
     _ws = null; _assignment = null;
     if (_nativeRunner) { _nativeRunner.destroy(); _nativeRunner = null; }
     _saveState();
     log('INFO', 'worker: disconnected', { code, reconnectMs: Math.round(_reconnectDelay) });
-    _reconnectDelay = Math.min(_reconnectDelay * 1.5, 60_000);
+    // Cap backoff low (8s) — a dropped worker's layers are missing from the
+    // pipeline until it rejoins, so every request fails meanwhile. Reconnect fast.
+    _reconnectDelay = Math.min(_reconnectDelay * 1.5, 8_000);
     _reconnectTimer = setTimeout(_connect, _reconnectDelay);
   });
 

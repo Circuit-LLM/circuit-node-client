@@ -22,6 +22,13 @@ data/*.log
 !.env.example
 *.secret
 
+# Native build artifacts (compiled binaries / objects — keep source only)
+native/circuit-runner
+native/circuit-runner-cuda
+native/*.o
+native/*.so
+native/cuda-libs/
+
 # OS
 .DS_Store
 Thumbs.db
