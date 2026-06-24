@@ -22,7 +22,7 @@
 ## What it does
 
 - **Joins the CIRCUIT data mesh** — syncs on-chain data from the canonical hub and serves it locally. In Phase 2, each node owns a dedicated shard of indexed Solana data.
-- **Runs decentralized LLM inference** — holds a shard of a transformer model (Qwen2.5-0.5B) and processes pipeline steps. Earn a proportional share of CIRC inference fees for every request your node handles.
+- **Optionally runs a GPU inference node** — one command turns a GPU box into a stage of the **decentralized Qwen2.5-72B**, serving real traffic and earning a proportional share of CIRC inference fees. See [Run a GPU node](#run-a-gpu-node-earn-circ).
 - **Free inference chat** — the dashboard's Inference tab gives you a streaming LLM chat interface, connected to the CIRCUIT decentralized network. Free for node operators running a co-located coordinator.
 - **Stays current automatically** — checks GitHub releases every hour, verifies checksum + ed25519 operator signature before applying, and keeps a rollback archive so you can revert to any previous version.
 - **Tracks CIRC staking** — connects your Phantom or Solflare wallet to verify your on-chain stake. Phase 3 will use stake to gate RPC access tiers.
@@ -50,7 +50,7 @@ On first run the node generates a permanent ed25519 keypair, announces itself to
 
 - **Node.js ≥ 18** — check with `node --version`
 - Internet access to reach `node.circuitllm.xyz`
-- ~80MB RAM if joining the LLM inference worker pool (optional)
+- An **NVIDIA GPU** only if you also run a GPU inference node — that's a **separate one-line Docker install** ([Run a GPU node](#run-a-gpu-node-earn-circ)), not this Node.js client
 
 ---
 
@@ -70,40 +70,53 @@ Open **`http://localhost:19000`** while the node is running for full visibility 
 
 ---
 
-## Decentralized LLM Inference
+## Run a GPU node (earn CIRC)
 
-### Free Chat for Node Operators
+GPU inference runs the real engine ([Circuit-LLM/circuit-dllm](https://github.com/Circuit-LLM/circuit-dllm)),
+not this Node.js client. Your GPU holds a contiguous slice of **Qwen2.5-72B-Instruct-AWQ**, the
+coordinator pipelines activations through it, and you earn CIRC ∝ the layers × tokens you serve.
 
-The **Inference tab** streams responses from the CIRCUIT decentralized LLM — model **Qwen2.5-0.5B-Instruct**, running distributed across the worker mesh.
+**One command** (Linux, or Windows via WSL2 — needs an NVIDIA GPU):
 
-Requests proxy through your node's local API at `POST /inference/chat`. When the inference coordinator is on the same machine as your node (the default for co-located setups), requests hit `localhost:19200` and bypass the x402 payment gate — **inference is completely free**.
-
-- Streams token-by-token as the distributed pipeline processes them
-- Maintains conversation context across turns (up to 12 messages)
-- **CLEAR** button to reset the session
-
-### Joining the Worker Pool (Earn CIRC)
-
-Enable the inference worker in `config/client.json` to hold a transformer layer shard and earn a share of CIRC inference fees proportional to the layers you run:
-
-```json
-"llmWorker": {
-  "enabled":        true,
-  "port":           19110,
-  "coordinatorUrl": "https://inference.circuitllm.xyz",
-  "walletAddress":  "YourSolanaWalletForCircPayouts"
-}
+```bash
+curl -fsSL https://circuitllm.xyz/join | bash
 ```
 
-| Field | Description |
-|-------|-------------|
-| `port` | TCP port the coordinator connects to for tensor pipeline traffic |
-| `coordinatorUrl` | The inference coordinator URL — do not change |
-| `walletAddress` | Your Solana wallet address for CIRC earnings attribution |
+It auto-installs Docker + the NVIDIA Container Toolkit if missing, pulls the GPU image, asks for a
+payout wallet, and runs an auto-restarting container. **You never touch a docker command.** The node
+detects your GPU, sizes how many layers it can hold from VRAM, registers (ed25519-signed) at
+`https://node.circuitllm.xyz`, downloads only its assigned slice, and serves.
 
-> The weight-delivery HTTP port is always `port + 1000` (e.g. 19110 → weight delivery on 20110). Both ports must be reachable inbound from the coordinator.
+- **Cloud / public-IP GPUs** (RunPod, Vast, a rented box) work out of the box.
+- **Home desktops behind NAT** — no port-forwarding: set `CIRCUIT_RELAY_URL=<relay-host:port>` and the
+  node dials out to the relay, which bridges the coordinator to it ([RELAY.md](https://github.com/Circuit-LLM/circuit-dllm/blob/main/docs/RELAY.md)).
+- **Verification, not gating** — the mesh is open; a new GPU starts on probation (never the primary
+  for a token) and is promoted only after it passes correctness challenges against a trusted replica
+  ([VERIFICATION.md](https://github.com/Circuit-LLM/circuit-dllm/blob/main/docs/VERIFICATION.md)).
 
-**Resource usage:** ~80MB RAM · ~40MB model weight download on startup · CPU bursts ~1–2s per inference step
+Manage it with plain Docker: `docker logs -f circuit-gpu-node`, `docker stop circuit-gpu-node`.
+
+### Windows (WSL2)
+
+A Windows desktop with an NVIDIA GPU joins through WSL2 — the GPU passes through, no dual-boot:
+
+1. **Install WSL2** (PowerShell as admin): `wsl --install` → reboot.
+2. **Install the NVIDIA *Windows* driver** (the Game-Ready/Studio driver — it provides CUDA to WSL).
+   Do **not** install a GPU driver *inside* WSL; the Windows driver is the one WSL uses.
+3. Open the **Ubuntu (WSL)** terminal and run the same one-liner:
+   ```bash
+   curl -fsSL https://circuitllm.xyz/join | bash
+   ```
+The installer detects WSL2 and sets up Docker + the NVIDIA Container Toolkit inside it. Most home
+Windows boxes are behind NAT — set `CIRCUIT_RELAY_URL` so the node joins via the relay.
+
+## Free chat for node operators
+
+The dashboard's **Inference tab** streams from the live decentralized **Qwen2.5-72B** — token by
+token, with multi-turn context and a CLEAR button. For an operator co-located with the coordinator it
+hits `localhost:19200` and bypasses the x402 gate, so it's **free**.
+
+**Resource usage (this Node.js client):** ~80MB RAM — it runs data sync + the dashboard and is light. GPU inference is a **separate** Docker container with its own (GPU) footprint.
 
 → [Full setup and firewall guide](GUIDE.md#llm-inference-worker)
 
@@ -226,7 +239,8 @@ To disable auto-update:
 | Node impersonation | All registry mutations are signature-verified server-side |
 | Inference access | x402 CIRC payment gate on external endpoint; localhost bypass for co-located nodes |
 | External chat access | WebSocket chat accepts localhost connections only |
-| Cluster auth | Worker sends HMAC-SHA256 of `nodeId:timestamp` using `llmWorker.clusterKey` — must match coordinator's `CLUSTER_KEY` env var. Leave empty for localhost-only setups |
+| GPU node auth | Each GPU node has a permanent ed25519 identity (node_id = public key); it signs its registration and the relay nonce, and receives a **per-node** ChaCha20 data-wire key — revoking one node never re-keys the rest. No shared cluster key |
+| Verified compute | New GPU nodes serve on probation and are promoted only after passing correctness challenges against a trusted replica — a bad node never becomes the primary for a token |
 | KV cache isolation | KV state resets at position 0 of each new sequence — no bleed between sessions |
 | Corrupt shards | Dequantization bounds-checked on load — truncated shards throw before inference |
 | Duplicate connections | Worker skips reconnect if already connected or connecting |
