@@ -250,6 +250,7 @@ tr:last-child td{border-bottom:none}
   <div class="tab" onclick="showTab('network')"><span class="dot"></span>NETWORK</div>
   <div class="tab" onclick="showTab('updates')"><span class="dot"></span>UPDATES</div>
   <div class="tab" onclick="showTab('staking')" id="tab-staking"><span class="dot"></span>STAKING</div>
+  <div class="tab" onclick="showTab('dllm')" id="tab-dllm"><span class="dot"></span>DLLM</div>
   <div class="tab" onclick="showTab('inference')" id="tab-inference"><span class="dot"></span>INFERENCE</div>
   <div class="tab" onclick="showTab('agent')"><span class="dot"></span>AGENT</div>
   <div class="tab" onclick="showTab('chat')" id="tab-chat"><span class="dot"></span>CHAT</div>
@@ -638,16 +639,58 @@ tr:last-child td{border-bottom:none}
     </div>
   </section>
 
+  <!-- ── DLLM (decentralized LLM: model + mesh + your contribution + settings) ── -->
+  <section class="panel" id="panel-dllm">
+    <div class="g2 mb">
+      <div class="card">
+        <div class="card-t">DECENTRALIZED LLM</div>
+        <div class="kv"><span class="kv-k">Model</span><span class="kv-v amber" id="dllm-model">—</span></div>
+        <div class="kv"><span class="kv-k">Connection</span><span class="kv-v" id="dllm-conn">—</span></div>
+        <div class="kv"><span class="kv-k">Endpoint</span><span class="kv-v" id="dllm-endpoint">—</span></div>
+        <div class="kv"><span class="kv-k">Coverage</span><span class="kv-v" id="dllm-coverage">—</span></div>
+        <div style="margin-top:12px">
+          <button class="btn" onclick="showTab('inference')" style="font-size:10px">CHAT WITH THE NETWORK →</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-t">YOUR GPU CONTRIBUTION</div>
+        <div class="kv"><span class="kv-k">Worker</span><span class="kv-v" id="dllm-w-status">—</span></div>
+        <div class="kv"><span class="kv-k">Layers Served</span><span class="kv-v" id="dllm-w-layers">—</span></div>
+        <div class="kv"><span class="kv-k">Port</span><span class="kv-v" id="dllm-w-port">—</span></div>
+        <div class="kv"><span class="kv-k">Worker Uptime</span><span class="kv-v" id="dllm-w-uptime">—</span></div>
+        <div class="kv"><span class="kv-k">Restarts</span><span class="kv-v" id="dllm-w-restarts">—</span></div>
+        <div id="dllm-w-enable" style="margin-top:12px;display:none">
+          <p style="font-size:11px;color:var(--muted);line-height:1.7">This node isn't contributing GPU compute. To serve model layers and earn CIRC, run on a GPU box and set
+            <code style="color:var(--green)">llmWorker.enabled: true</code> in <code style="color:var(--green)">config/client.json</code>.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb">
+      <div class="card-t">MESH TOPOLOGY <span id="dllm-mesh-sub" style="float:right;color:var(--muted);font-size:9px;letter-spacing:.06em"></span></div>
+      <div id="dllm-mesh-slots" style="font-size:11px;color:var(--muted)">Loading mesh…</div>
+    </div>
+
+    <div class="card">
+      <div class="card-t">SETTINGS</div>
+      <div class="kv"><span class="kv-k">Coordinator URL</span><span class="kv-v" id="dllm-set-coord">—</span></div>
+      <div class="kv"><span class="kv-k">Advertise Host</span><span class="kv-v" id="dllm-set-host">—</span></div>
+      <div class="kv"><span class="kv-k">Payout Wallet</span><span class="kv-v" id="dllm-set-wallet">—</span></div>
+      <p style="font-size:10px;color:var(--muted);margin-top:10px;line-height:1.7">Edit under <code style="color:var(--green)">llmWorker</code> in
+        <code style="color:var(--green)">config/client.json</code>, then <code style="color:var(--green)">node node-client.js</code> restart to apply.</p>
+    </div>
+  </section>
+
   <!-- ── INFERENCE ── -->
   <section class="panel" id="panel-inference" style="padding:0">
     <div style="background:var(--s2);border-bottom:1px solid var(--border2);padding:6px 16px;display:flex;align-items:center;gap:10px;font-size:10px;flex-shrink:0">
       <div id="infer-dot" style="width:6px;height:6px;border-radius:50%;background:var(--dim);flex-shrink:0;transition:background .3s"></div>
       <span id="infer-status-text" style="color:var(--muted);letter-spacing:.06em">Connecting to inference coordinator…</span>
-      <span style="margin-left:auto;color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.7">QWEN2.5-0.5B · CIRCUIT NETWORK</span>
+      <span id="infer-model-label" style="margin-left:auto;color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.7">CIRCUIT NETWORK</span>
     </div>
     <div class="chat-wrap">
       <div class="chat-messages" id="infer-messages">
-        <div class="chat-msg system">Decentralized inference via the CIRCUIT worker mesh. Powered by Qwen2.5-0.5B-Instruct.</div>
+        <div class="chat-msg system">Decentralized inference via the CIRCUIT worker mesh.</div>
       </div>
       <div class="chat-status-bar">
         <span id="infer-info-label" style="color:var(--muted)">CIRCUIT Decentralized LLM</span>
@@ -800,6 +843,7 @@ function showTab(id) {
   if (id === 'agent')      { loadAgentData(); }
   if (id === 'chat')       renderChat();
   if (id === 'inference')  renderInference();
+  if (id === 'dllm')       loadDllmInfo();
   if (id === 'staking')    loadStakeConfig();
   if (id === 'rpc')        _refreshRpcStakeSummary();
 }
@@ -1638,6 +1682,52 @@ async function renderInference() {
   }
 }
 
+// ── DLLM tab: model + mesh + this node's worker contribution + settings ──
+async function loadDllmInfo() {
+  const d = await api('/dllm/info');
+  if (!d) { txt('dllm-conn', 'unreachable'); return; }
+  txt('dllm-model', d.model || 'unknown');
+  txt('dllm-endpoint', d.endpoint || 'not connected');
+  txt('dllm-conn', d.connected ? 'CONNECTED' : 'offline');
+  const connEl = $('dllm-conn'); if (connEl) connEl.className = 'kv-v ' + (d.connected ? 'green' : 'red');
+
+  // mesh
+  if (d.mesh) {
+    const slots = d.mesh.slots || [];
+    const holders = slots.reduce((a, s) => a + (s.holders?.length || 0), 0);
+    txt('dllm-coverage', d.mesh.coverage_ok ? 'OK — full model covered' : 'GAP — under-covered');
+    const covEl = $('dllm-coverage'); if (covEl) covEl.className = 'kv-v ' + (d.mesh.coverage_ok ? 'green' : 'red');
+    txt('dllm-mesh-sub', `${d.mesh.model_fp || ''} · repl ${d.mesh.replication ?? '—'} · ${holders} holder${holders === 1 ? '' : 's'}`);
+    $('dllm-mesh-slots').innerHTML = slots.length ? slots.map(s => {
+      const hs = (s.holders || []).map(h => {
+        const ok = h.state === 'ready' && h.trust === 'trusted';
+        return `<span style="color:${ok ? 'var(--green)' : 'var(--amber)'}">${(h.node_id || '').slice(0, 8)}…[${h.state}/${h.trust}]</span>`;
+      }).join(' &nbsp; ') || '<span style="color:var(--red)">no holder</span>';
+      return `<div class="kv"><span class="kv-k">layers ${s.layers[0]}–${s.layers[1]}</span><span class="kv-v" style="text-align:right">${hs}</span></div>`;
+    }).join('') : '<span style="color:var(--muted)">no mesh data</span>';
+  } else {
+    txt('dllm-coverage', '—'); $('dllm-mesh-slots').innerHTML = '<span style="color:var(--muted)">mesh unreachable</span>';
+  }
+
+  // this node's worker
+  const w = d.worker || { enabled: false };
+  const running = w.enabled && (w.running || w.state === 'running' || w.status === 'running');
+  txt('dllm-w-status', !w.enabled ? 'not running' : (running ? 'SERVING' : (w.state || w.status || 'starting…')));
+  const wEl = $('dllm-w-status'); if (wEl) wEl.className = 'kv-v ' + (running ? 'green' : (w.enabled ? 'amber' : 'muted'));
+  txt('dllm-w-layers', w.assignment ? `${w.assignment.start}–${w.assignment.end}` : (w.layers || '—'));
+  txt('dllm-w-port', w.port || '—');
+  txt('dllm-w-uptime', w.uptime ? fmtUptime(w.uptime) : '—');
+  txt('dllm-w-restarts', w.restarts ?? '—');
+  $('dllm-w-enable').style.display = w.enabled ? 'none' : 'block';
+
+  // settings (from config, surfaced via /node)
+  const n = window._cfgCache || {};
+  txt('dllm-set-coord', n.coordinatorUrl || (d.endpoint || '—'));
+  txt('dllm-set-host', n.advertiseHost || '—');
+  txt('dllm-set-wallet', n.payoutWallet || 'not set');
+}
+function fmtUptime(s) { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m ${s % 60}s`; }
+
 async function _inferCheckStatus() {
   const dot = $('infer-dot');
   try {
@@ -1646,6 +1736,7 @@ async function _inferCheckStatus() {
     if (r.ok && d.available) {
       if (dot) dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:var(--yellow);flex-shrink:0;box-shadow:0 0 6px var(--yellow);transition:background .3s';
       txt('infer-status-text', `Ready · ${d.endpoint || 'localhost:19200'}`);
+      if (d.model) txt('infer-model-label', `${d.model.toUpperCase()} · CIRCUIT NETWORK`);
       $('infer-send').disabled = false;
     } else {
       if (dot) dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:var(--amber);flex-shrink:0;transition:background .3s';
