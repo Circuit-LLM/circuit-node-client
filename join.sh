@@ -14,7 +14,7 @@ set -euo pipefail
 IMAGE="${CIRCUIT_IMAGE:-ghcr.io/circuit-llm/gpu-node:latest}"
 CONTAINER="${CIRCUIT_CONTAINER:-circuit-gpu-node}"
 VOLUME="${CIRCUIT_VOLUME:-circuit-gpu}"
-CONTROL_URL_DEFAULT="https://join.circuitllm.xyz"
+CONTROL_URL_DEFAULT="https://node.circuitllm.xyz"
 
 c()   { printf '\033[%sm%s\033[0m' "$1" "$2"; }
 say()  { echo "$(c '1;36' '▸') $*"; }
@@ -102,6 +102,7 @@ ARGS=(-d --name "$CONTAINER" --gpus all --restart unless-stopped
 [ -n "$ADV_HOST" ]                      && ARGS+=(-e CIRCUIT_ADVERTISE_HOST="$ADV_HOST")
 [ -n "${CIRCUIT_ADVERTISE_PORT:-}" ]    && ARGS+=(-e CIRCUIT_ADVERTISE_PORT="$CIRCUIT_ADVERTISE_PORT")
 [ -n "${CIRCUIT_RELAY_URL:-}" ]         && ARGS+=(-e CIRCUIT_RELAY_URL="$CIRCUIT_RELAY_URL")
+[ -n "${CIRCUIT_RELAY_TOKEN:-}" ]       && ARGS+=(-e CIRCUIT_RELAY_TOKEN="$CIRCUIT_RELAY_TOKEN")
 [ -n "${CIRCUIT_REGION:-}" ]            && ARGS+=(-e CIRCUIT_REGION="$CIRCUIT_REGION")
 run docker run "${ARGS[@]}" "$IMAGE" >/dev/null
 
