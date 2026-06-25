@@ -1,79 +1,71 @@
 {
   "_comment": "circuit-node-client configuration. Edit before first run.",
-
   "network": {
-    "registryUrl":    "https://node.circuitllm.xyz",
-    "bootstrapUrl":   "https://node.circuitllm.xyz",
-    "bootstrapPort":  18500,
+    "registryUrl": "https://node.circuitllm.xyz",
+    "bootstrapUrl": "https://node.circuitllm.xyz",
+    "bootstrapPort": 18500,
     "networkVersion": 1,
-    "solanaRpcUrl":   "https://api.mainnet-beta.solana.com"
+    "solanaRpcUrl": "https://api.mainnet-beta.solana.com"
   },
-
   "node": {
-    "version":        "0.1.0",
-    "region":         "unknown",
-    "apiPort":        19000,
-    "agentEnabled":   false,
-    "agentDataPath":  null,
-    "_agentNote":     "Set agentDataPath to your circuit-agent/data directory to connect an agent. E.g.: \"../circuit-agent/data\"",
-    "shards":         ["all"],
-    "phase":          1
+    "version": "0.1.0",
+    "region": "unknown",
+    "apiPort": 19000,
+    "agentEnabled": false,
+    "agentDataPath": null,
+    "_agentNote": "Set agentDataPath to your circuit-agent/data directory to connect an agent. E.g.: \"../circuit-agent/data\"",
+    "shards": [
+      "all"
+    ],
+    "phase": 1
   },
-
   "heartbeat": {
-    "intervalMs":   60000,
-    "maxMissed":    3
+    "intervalMs": 60000,
+    "maxMissed": 3
   },
-
   "sync": {
-    "enabled":      false,
-    "protocol":     "grpc",
+    "enabled": false,
+    "protocol": "grpc",
     "grpcEndpoint": null,
-    "intervalMs":   5000,
-    "maxLagMs":     30000
+    "intervalMs": 5000,
+    "maxLagMs": 30000
   },
-
   "access": {
     "encryptionEnabled": false,
     "circWalletAddress": null,
-    "minCircBalance":   100,
-    "circMint":         "8fQgfsRnRkKSeNUhevT7wp8mhNvMSJdLn1fJi4oVpump",
-
-    "_stakingNote":     "Stake CIRC to unlock free RPC access. Set stakingPool to the Circuit pool address from stakepoint.app.",
-    "stakingPool":      null,
-    "stakingPoolId":    null,
-    "minStakeCirc":     100000,
-    "circDecimals":     6
+    "minCircBalance": 100,
+    "circMint": "8fQgfsRnRkKSeNUhevT7wp8mhNvMSJdLn1fJi4oVpump",
+    "_stakingNote": "Stake CIRC to unlock free RPC access + earn payouts. minStakeCirc is the NET minimum after StakePoint's 2% fee; stake ~5,000,000 gross to clear 4,900,000 net. Pool from stakepoint.app.",
+    "stakingPool": "5rpFdxnRtLDcUBN1z91wmiM1TLxx1TWKMz9eKkpouiPr",
+    "stakingPoolId": "5rpFdxnRtLDcUBN1z91wmiM1TLxx1TWKMz9eKkpouiPr",
+    "minStakeCirc": 4900000,
+    "circDecimals": 6
   },
-
   "updates": {
-    "autoUpdate":         true,
-    "checkIntervalMs":    3600000,
-    "signingPublicKey":   null,
-    "_signingNote":       "Operator public key for verifying signed updates. Set by generate-signing-key.js output. Leave null to skip verification (not recommended for production)."
+    "autoUpdate": true,
+    "checkIntervalMs": 3600000,
+    "signingPublicKey": null,
+    "_signingNote": "Operator public key for verifying signed updates. Set by generate-signing-key.js output. Leave null to skip verification (not recommended for production)."
   },
-
   "chat": {
     "maxHistory": 20,
-    "_note": "Chat is provided by the connected circuit-agent. No LLM key needed here — the agent's own llm.openrouterKey is used automatically."
+    "_note": "Chat is provided by the connected circuit-agent. No LLM key needed here \u2014 the agent's own llm.openrouterKey is used automatically."
   },
-
   "logging": {
     "level": "info"
   },
-
   "llmWorker": {
-    "enabled":        false,
-    "_enabledNote":   "Set to true to join the Circuit decentralized LLM inference network. Your node will receive a transformer layer shard and earn CIRC for compute.",
-    "port":           19110,
-    "_portNote":      "TCP port the coordinator connects to for tensor pipeline. Must be unique per node. HTTP weight-delivery port = this port + 1000.",
+    "enabled": false,
+    "_enabledNote": "Set to true to join the Circuit decentralized LLM inference network. Your node will receive a transformer layer shard and earn CIRC for compute.",
+    "port": 19110,
+    "_portNote": "TCP port the coordinator connects to for tensor pipeline. Must be unique per node. HTTP weight-delivery port = this port + 1000.",
     "coordinatorUrl": "https://inference.circuitllm.xyz",
-    "_coordNote":     "URL of the circuit-decentralized-llm coordinator.",
-    "clusterKey":     "",
-    "_keyNote":       "Shared secret for coordinator authentication. Required for remote coordinators. Must match coordinator clusterKey.",
-    "host":           "",
-    "_hostNote":      "Public IP or hostname the coordinator can reach to open the TCP tensor pipeline. Required if your machine is behind NAT. Example: '203.0.113.42' or 'mynode.example.com'. Leave blank if running on the same machine as the coordinator.",
-    "walletAddress":  null,
-    "_walletNote":    "Your Solana wallet address for CIRC payment attribution. If set, you earn a share of inference fees proportional to layers you run."
+    "_coordNote": "URL of the circuit-decentralized-llm coordinator.",
+    "clusterKey": "",
+    "_keyNote": "Shared secret for coordinator authentication. Required for remote coordinators. Must match coordinator clusterKey.",
+    "host": "",
+    "_hostNote": "Public IP or hostname the coordinator can reach to open the TCP tensor pipeline. Required if your machine is behind NAT. Example: '203.0.113.42' or 'mynode.example.com'. Leave blank if running on the same machine as the coordinator.",
+    "walletAddress": null,
+    "_walletNote": "Your Solana wallet address for CIRC payment attribution. If set, you earn a share of inference fees proportional to layers you run."
   }
 }
