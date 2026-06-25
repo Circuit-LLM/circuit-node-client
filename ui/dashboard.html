@@ -690,6 +690,12 @@ tr:last-child td{border-bottom:none}
         <div class="kv"><span class="kv-k">Port</span><span class="kv-v" id="dllm-w-port">—</span></div>
         <div class="kv"><span class="kv-k">Worker Uptime</span><span class="kv-v" id="dllm-w-uptime">—</span></div>
         <div class="kv"><span class="kv-k">Restarts</span><span class="kv-v" id="dllm-w-restarts">—</span></div>
+        <div id="dllm-w-controls" style="margin-top:12px;display:none;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="dllm-w-startbtn" onclick="dllmWorker('start')" style="display:none">▶ START</button>
+          <button class="btn" id="dllm-w-restartbtn" onclick="dllmWorker('restart')" style="display:none">↻ RESTART</button>
+          <button class="btn" id="dllm-w-stopbtn" onclick="dllmWorker('stop')" style="display:none;color:var(--red);border-color:var(--red)">■ STOP</button>
+        </div>
+        <div id="dllm-w-ctrl-note" style="margin-top:8px;font-size:9px;color:var(--muted);display:none">Worker control is local-only. For a remote node, tunnel first: <code style="color:var(--green)">ssh -L PORT:localhost:PORT</code></div>
         <div id="dllm-w-enable" style="margin-top:12px;display:none">
           <p style="font-size:11px;color:var(--muted);line-height:1.7">This node isn't contributing GPU compute. To serve model layers and earn CIRC, run on a GPU box and set
             <code style="color:var(--green)">llmWorker.enabled: true</code> in <code style="color:var(--green)">config/client.json</code>.</p>
@@ -1785,11 +1791,36 @@ async function loadDllmInfo() {
   txt('dllm-w-restarts', w.restarts ?? '—');
   $('dllm-w-enable').style.display = w.enabled ? 'none' : 'block';
 
-  // settings (from config, surfaced via /node)
-  const n = window._cfgCache || {};
-  txt('dllm-set-coord', n.coordinatorUrl || (d.endpoint || '—'));
-  txt('dllm-set-host', n.advertiseHost || '—');
-  txt('dllm-set-wallet', n.payoutWallet || 'not set');
+  // control buttons: shown only when a worker is configured; start vs stop/restart by run state
+  const ctrls = $('dllm-w-controls');
+  if (ctrls) {
+    ctrls.style.display = w.enabled ? 'flex' : 'none';
+    $('dllm-w-ctrl-note').style.display = w.enabled ? 'block' : 'none';
+    $('dllm-w-startbtn').style.display   = (w.enabled && !running) ? '' : 'none';
+    $('dllm-w-stopbtn').style.display    = running ? '' : 'none';
+    $('dllm-w-restartbtn').style.display = running ? '' : 'none';
+  }
+
+  // settings (from the worker config, surfaced by /dllm/info)
+  const st = d.settings || {};
+  txt('dllm-set-coord', st.coordinatorUrl || d.endpoint || '—');
+  txt('dllm-set-host', st.advertiseHost || '—');
+  txt('dllm-set-wallet', st.payoutWallet || 'not set');
+}
+
+async function dllmWorker(action) {
+  if (action === 'stop' && !confirm(
+    'Stop this GPU worker?\n\n• It will STOP EARNING CIRC.\n• If this node is the only holder of its mesh slot, inference for the WHOLE network pauses until it restarts.\n\nContinue?')) return;
+  const btnNote = $('dllm-w-ctrl-note');
+  try {
+    const r = await fetch(`/dllm/worker/${action}`, { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { if (btnNote) { btnNote.textContent = d.error || 'control failed'; btnNote.style.color = 'var(--red)'; } return; }
+    if (btnNote) { btnNote.textContent = action === 'restart' ? 'restarting worker…' : `worker ${action} sent`; btnNote.style.color = 'var(--muted)'; }
+    setTimeout(loadDllmInfo, action === 'restart' ? 5000 : 1200);
+  } catch (e) {
+    if (btnNote) { btnNote.textContent = 'cannot reach node: ' + e.message; btnNote.style.color = 'var(--red)'; }
+  }
 }
 function fmtUptime(s) { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m ${s % 60}s`; }
 
