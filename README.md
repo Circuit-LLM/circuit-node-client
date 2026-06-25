@@ -66,7 +66,10 @@ Open **`http://localhost:19000`** while the node is running for full visibility 
 | **Updates** | Current vs latest version, update history, one-click rollback controls |
 | **Inference** | Free streaming LLM chat via the CIRCUIT decentralized inference network |
 | **Agent** | Trading stats and positions (if a `circuit-agent` is paired) |
+| **Cloud** | Your contribution to the **agent cloud** — whether this node is hosting agents, which ones (state, P&L, uptime), and cloud-wide node/agent counts |
 | **Chat** | Conversation interface with a paired `circuit-agent` |
+
+The **Cloud** tab is read-only. If you've lent spare CPU to the agent cloud (`circuit agent host`), it shows the agents this node runs for other users. Custody is **off-box** — your machine runs the agents' compute but never holds their signing keys (those live in the [signer](https://github.com/Circuit-LLM/circuit-agent-cloud)). Not contributing yet? The tab tells you how to start.
 
 ---
 
@@ -145,6 +148,17 @@ Minimum setup to get started:
 ```
 
 **Region codes:** `us-east` · `us-west` · `eu-west` · `eu-central` · `ap-southeast` · `ap-northeast`
+
+**Agent cloud (Cloud tab):** to surface your CPU-hosting contribution, add an `agentCloud` block. Both fields are optional — leave `hostDir` null to read the default `~/.circuit-host`, and set `controlPlane` to also show cloud-wide stats (or use the `CIRCUIT_CONTROL_PLANE` env var):
+
+```json
+{
+  "agentCloud": {
+    "hostDir": null,
+    "controlPlane": "https://agents.circuitllm.xyz"
+  }
+}
+```
 
 If you skip this step, the node auto-creates `client.json` from the example on first launch.
 

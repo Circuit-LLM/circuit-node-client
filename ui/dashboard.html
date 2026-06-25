@@ -255,6 +255,7 @@ tr:last-child td{border-bottom:none}
   <div class="tab" onclick="showTab('dllm')" id="tab-dllm"><span class="dot"></span>DLLM</div>
   <div class="tab" onclick="showTab('inference')" id="tab-inference"><span class="dot"></span>INFERENCE</div>
   <div class="tab" onclick="showTab('agent')"><span class="dot"></span>AGENT</div>
+  <div class="tab" onclick="showTab('cloud')"><span class="dot"></span>CLOUD</div>
   <div class="tab" onclick="showTab('chat')" id="tab-chat"><span class="dot"></span>CHAT</div>
 </nav>
 
@@ -831,6 +832,53 @@ tr:last-child td{border-bottom:none}
     </div>
   </section>
 
+  <!-- ── CLOUD: this node's contribution to the agent cloud (CPU hosting) ── -->
+  <section class="panel" id="panel-cloud">
+    <div id="cloud-disabled-msg" class="card mb" style="display:none">
+      <div class="card-t">Not Contributing CPU</div>
+      <p style="font-size:11px;color:var(--muted);line-height:1.8">
+        This node isn't hosting agents for the <strong>Circuit agent cloud</strong> yet. Lend spare CPU to run
+        other users' autonomous agents — opt-in, bounded, revocable:
+        <br><br>
+        <code style="color:var(--green)">circuit agent host --max-agents 20</code>
+        <br><br>
+        Inference runs on the GPUs; agents run on the CPUs that hang off the same node. Every agent's signing key
+        stays <strong>off-box</strong> in the signer — your machine only ever runs the agent's compute and never
+        holds a user's key. <code style="color:var(--green)">circuit agent host --off</code> drains &amp; stops.
+      </p>
+    </div>
+
+    <div id="cloud-content" style="display:none">
+      <div class="chips chips-3 mb">
+        <div class="chip"><div class="chip-l">Hosting</div><div class="chip-v" id="cl-status">—</div></div>
+        <div class="chip"><div class="chip-l">Agents Hosted</div><div class="chip-v green" id="cl-count">—</div></div>
+        <div class="chip"><div class="chip-l">Cloud Nodes</div><div class="chip-v" id="cl-nodes">—</div></div>
+      </div>
+
+      <div class="card mb">
+        <div class="card-t">This Node</div>
+        <div class="kv"><span class="kv-k">Node ID</span><span class="kv-v" id="cl-nodeid">—</span></div>
+        <div class="kv"><span class="kv-k">Control Plane</span><span class="kv-v" id="cl-cp">—</span></div>
+        <div class="kv"><span class="kv-k">Budget</span><span class="kv-v" id="cl-budget">—</span></div>
+        <div class="kv"><span class="kv-k">Custody</span><span class="kv-v teal">off-box signer</span></div>
+        <div class="kv"><span class="kv-k">Updated</span><span class="kv-v" id="cl-updated">—</span></div>
+      </div>
+
+      <div class="card mb">
+        <div class="card-t">Hosted Agents</div>
+        <div id="cl-agents-list">
+          <div style="font-size:11px;color:var(--muted)">No agents hosted right now.</div>
+        </div>
+      </div>
+
+      <div id="cl-cloud-card" class="card" style="display:none">
+        <div class="card-t">Agent Cloud</div>
+        <div class="kv"><span class="kv-k">Nodes online</span><span class="kv-v" id="cl-cloud-nodes">—</span></div>
+        <div class="kv"><span class="kv-k">Agents running</span><span class="kv-v" id="cl-cloud-agents">—</span></div>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <script>
@@ -895,6 +943,7 @@ function showTab(id) {
   if (id === 'network')    renderNetwork();
   if (id === 'updates')    renderUpdates();
   if (id === 'agent')      { loadAgentData(); }
+  if (id === 'cloud')      loadCloudData();
   if (id === 'chat')       renderChat();
   if (id === 'inference')  renderInference();
   if (id === 'dllm')       loadDllmInfo();
@@ -1374,6 +1423,71 @@ async function loadAgentData() {
     const r = await fetch(`${BASE}/agent/status`);
     if (r.ok) { _agentData = await r.json(); renderAgent(); }
   } catch {}
+}
+
+// ── Agent cloud (CPU hosting) ──────────────────────────────────────────────────
+let _cloudData = {};
+const _CLOUD_STATE_COLOR = { running: 'var(--green)', scheduled: 'var(--amber)', pending: 'var(--amber)',
+  stopping: 'var(--amber)', stopped: 'var(--muted)', failed: 'var(--red)' };
+
+async function loadCloudData() {
+  try {
+    const r = await fetch(`${BASE}/cloud/status`);
+    if (r.ok) { _cloudData = await r.json(); renderCloud(); }
+  } catch {}
+}
+
+function renderCloud() {
+  const d = _cloudData || {};
+  const h = d.hosting || {};
+  // "Active" = this node is hosting, OR the cloud is reachable and we can show the wider view.
+  const show = !!(h.running || d.cloud?.reachable);
+  $('cloud-disabled-msg').style.display = show ? 'none' : 'block';
+  $('cloud-content').style.display      = show ? 'block' : 'none';
+  if (!show) return;
+
+  txt('cl-status', h.running ? 'ACTIVE' : 'IDLE', h.running ? 'green' : 'amber');
+  txt('cl-count',  h.agentCount ?? 0);
+  txt('cl-nodes',  d.cloud?.reachable ? `${d.cloud.nodesUp}/${d.cloud.nodes}` : '—');
+  txt('cl-nodeid', h.nodeId || '—');
+  txt('cl-cp',     h.controlPlane || 'not set');
+  txt('cl-budget', h.budget ? `${h.budget.maxAgents} agents · ${h.budget.maxMemoryMb}MB` : '—');
+  txt('cl-updated', h.updatedAt ? fmtAgo(new Date(h.updatedAt).toISOString()) : '—');
+
+  const agents = d.agents || [];
+  const box = $('cl-agents-list');
+  if (!agents.length) {
+    box.innerHTML = '<div style="font-size:11px;color:var(--muted)">No agents hosted right now.</div>';
+  } else {
+    const rows = agents.map(a => {
+      const col   = _CLOUD_STATE_COLOR[a.state] || 'var(--text)';
+      const pnl   = a.pnlPct != null ? (a.pnlPct >= 0 ? '+' : '') + a.pnlPct.toFixed(2) + '%' : '—';
+      const pnlC  = a.pnlPct == null ? 'var(--muted)' : (a.pnlPct >= 0 ? 'var(--green)' : 'var(--red)');
+      const up    = a.uptimeS != null ? fmtUptime(a.uptimeS) : '—';
+      return `<tr>
+        <td>${_esc(a.name || a.id)}</td>
+        <td style="color:var(--muted)">${_esc(a.workload || '—')}</td>
+        <td style="color:${col}">${_esc(a.state || '—')}</td>
+        <td style="text-align:right;color:${pnlC}">${_esc(pnl)}</td>
+        <td style="text-align:right">${a.scans ?? '—'}</td>
+        <td style="text-align:right;color:var(--muted)">${_esc(up)}</td>
+      </tr>`;
+    }).join('');
+    box.innerHTML = `<table>
+      <thead><tr>
+        <th>AGENT</th><th>WORKLOAD</th><th>STATE</th>
+        <th style="text-align:right">P&amp;L</th><th style="text-align:right">SCANS</th><th style="text-align:right">UPTIME</th>
+      </tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  }
+
+  if (d.cloud?.reachable) {
+    $('cl-cloud-card').style.display = 'block';
+    txt('cl-cloud-nodes',  `${d.cloud.nodesUp} / ${d.cloud.nodes}`);
+    txt('cl-cloud-agents', `${d.cloud.agentsRunning} / ${d.cloud.agents}`);
+  } else {
+    $('cl-cloud-card').style.display = 'none';
+  }
 }
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
@@ -2010,6 +2124,7 @@ async function init() {
     await loadLlmStatus();
     refreshOvStake();
     if ($('panel-agent')?.classList.contains('active'))   await loadAgentData();
+    if ($('panel-cloud')?.classList.contains('active'))   await loadCloudData();
     if ($('panel-staking')?.classList.contains('active') && _stakeWallet) await checkStake(_stakeWallet);
   }, 15_000);
 }

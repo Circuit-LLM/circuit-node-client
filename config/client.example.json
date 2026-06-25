@@ -67,5 +67,12 @@
     "_hostNote": "Public IP or hostname the coordinator can reach to open the TCP tensor pipeline. Required if your machine is behind NAT. Example: '203.0.113.42' or 'mynode.example.com'. Leave blank if running on the same machine as the coordinator.",
     "walletAddress": null,
     "_walletNote": "Your Solana wallet address for CIRC payment attribution. If set, you earn a share of inference fees proportional to layers you run."
+  },
+  "agentCloud": {
+    "_comment": "Powers the CLOUD tab — this node's contribution to the Circuit agent cloud (CPU hosting). Read-only display; the node-host holds no keys (custody is off-box in the signer).",
+    "hostDir": null,
+    "_hostDirNote": "The co-located node-host data dir. Leave null to use ~/.circuit-host. The dashboard reads <hostDir>/status.json.",
+    "controlPlane": null,
+    "_controlPlaneNote": "The agent-cloud control plane URL (e.g. https://agents.circuitllm.xyz). Optional — set it to also show cloud-wide stats. Falls back to the CIRCUIT_CONTROL_PLANE env var."
   }
 }

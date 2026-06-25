@@ -219,6 +219,29 @@ If no agent is connected, this tab shows "agent not configured."
 
 ---
 
+### Cloud Tab
+
+Your contribution to the **Circuit agent cloud** — the decentralized CPU layer that hosts other users' autonomous agents. (Inference runs on GPUs; agents run on the CPUs that hang off the same nodes.) The tab is **read-only** and shows:
+
+- **Hosting status** — whether this node is currently running cloud agents, and its budget (`MAX_AGENTS`, per-agent memory)
+- **Hosted agents** — each agent's name, workload, state, P&L, scans, and uptime
+- **Cloud-wide** — nodes online and agents running across the whole cloud (when a control plane is configured)
+
+Custody is **off-box**: this node runs the agents' compute but never holds their signing keys — those stay in the [signer](https://github.com/Circuit-LLM/circuit-agent-cloud). So nothing here can move funds; it's purely visibility.
+
+Configure it with an `agentCloud` block (both fields optional):
+
+```json
+"agentCloud": {
+  "hostDir": null,
+  "controlPlane": "https://agents.circuitllm.xyz"
+}
+```
+
+`hostDir` is the co-located node-host's data dir (the tab reads `<hostDir>/status.json`); leave it `null` to use `~/.circuit-host`. `controlPlane` adds the cloud-wide view (or set `CIRCUIT_CONTROL_PLANE`). Start contributing with `circuit agent host`; if you're not hosting yet, the tab explains how.
+
+---
+
 ### Chat Tab
 
 When an agent is connected, this tab gives you an LLM chat interface that speaks as your trading agent — with full context of open positions, trade history, and active strategy.
