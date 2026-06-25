@@ -36,8 +36,8 @@
     "minCircBalance": 100,
     "circMint": "8fQgfsRnRkKSeNUhevT7wp8mhNvMSJdLn1fJi4oVpump",
     "_stakingNote": "Stake CIRC to unlock free RPC access + earn payouts. minStakeCirc is the NET minimum after StakePoint's 2% fee; stake ~5,000,000 gross to clear 4,900,000 net. Pool from stakepoint.app.",
-    "stakingPool": "5rpFdxnRtLDcUBN1z91wmiM1TLxx1TWKMz9eKkpouiPr",
-    "stakingPoolId": "5rpFdxnRtLDcUBN1z91wmiM1TLxx1TWKMz9eKkpouiPr",
+    "stakingPool": "2E87KFdwyVE2cZR3s6cBrTyHyuGJvhQhHkYv5VbVUg3M",
+    "stakingPoolId": "2E87KFdwyVE2cZR3s6cBrTyHyuGJvhQhHkYv5VbVUg3M",
     "minStakeCirc": 4900000,
     "circDecimals": 6
   },
