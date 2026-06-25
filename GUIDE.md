@@ -118,7 +118,7 @@ node node-client.js deregister         # Remove from network and exit cleanly
 
 ## The Dashboard
 
-The dashboard runs at `http://localhost:19000`. It has seven tabs.
+The dashboard runs at `http://localhost:19000`. It has ten tabs.
 
 ### Overview Tab
 
@@ -134,11 +134,9 @@ If the hub shows as unreachable, check your internet connection. The node contin
 
 ---
 
-### Keys Tab
+### RPC Key Tab
 
-Shows your **Node ID** — the base64 ed25519 public key that identifies your node on the network. This is safe to share publicly. All registry communications are signed with the corresponding private key in `data/identity.json`.
-
-Also contains the **CIRC Staking** panel — connect your Phantom or Solflare wallet to verify your on-chain stake position. See the [CIRC Staking](#circ-staking) section below.
+Your **RPC API key** and node **public key** (the base64 ed25519 identity, safe to share — all registry communications are signed with the matching private key in `data/identity.json`). Also shows the local API **base URL** and **auth header**, plus your local-vs-external access tiers. Wallet connect and staking live in their own **Staking** tab (below).
 
 ---
 
@@ -175,6 +173,18 @@ Auto-update is on by default. To disable:
 ```json
 "updates": { "autoUpdate": false }
 ```
+
+---
+
+### Staking Tab
+
+Connect your Phantom or Solflare wallet to verify your on-chain CIRC stake in the CIRCUIT StakePoint pool. The panel shows your **staked amount**, the **requirement**, any **shortfall**, the **lock-until** date, and your **position address**. Staking unlocks free RPC access and earns payouts — see the [CIRC Staking](#circ-staking) section below.
+
+---
+
+### DLLM Tab
+
+The **decentralized-LLM mesh** at a glance: the live model, the endpoint your node talks to, and mesh coverage. If you run an inference worker (`llmWorker.enabled`), it also shows **your GPU contribution** — worker status and how many transformer layers you're serving. See [LLM Inference Worker](#llm-inference-worker) for setup.
 
 ---
 

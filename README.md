@@ -60,10 +60,12 @@ Open **`http://localhost:19000`** while the node is running for full visibility 
 
 | Tab | What you get |
 |-----|-------------|
-| **Overview** | Node identity, sync status, hub reachability, live activity log, uptime |
-| **Keys** | Node ID (ed25519 public key), CIRC staking status and wallet connect |
+| **Overview** | Node identity, version, region, sync status, hub reachability, live activity log, uptime |
+| **RPC Key** | Your RPC API key and node public key, the local API base URL + auth header, access tiers |
 | **Network** | Live node map, shard coverage, version distribution, peer list |
 | **Updates** | Current vs latest version, update history, one-click rollback controls |
+| **Staking** | Connect a wallet and view your CIRC stake position — staked amount, requirement, shortfall, lock |
+| **DLLM** | The decentralized-LLM mesh (model, endpoint, coverage) and your GPU worker contribution, if you run one |
 | **Inference** | Free streaming LLM chat via the CIRCUIT decentralized inference network |
 | **Agent** | Trading stats and positions (if a `circuit-agent` is paired) |
 | **Cloud** | Your contribution to the **agent cloud** — whether this node is hosting agents, which ones (state, P&L, uptime), and cloud-wide node/agent counts |
@@ -182,7 +184,7 @@ node node-client.js deregister         # Remove from network and exit cleanly
 
 ## CIRC Staking
 
-In the **Keys tab**, click **Connect Wallet** to link your Phantom or Solflare wallet. The panel queries your on-chain stake position in the CIRCUIT StakePoint pool and shows:
+In the **Staking tab**, click **Connect Wallet** to link your Phantom or Solflare wallet. The panel queries your on-chain stake position in the CIRCUIT StakePoint pool and shows:
 
 - Status badge — `● UNLOCKED` (stake met) or `○ STAKE REQUIRED`
 - Total staked CIRC across all positions
