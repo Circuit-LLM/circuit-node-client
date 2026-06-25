@@ -430,6 +430,15 @@ tr:last-child td{border-bottom:none}
             Connect your Solana wallet to verify your on-chain CIRC stake and unlock RPC access for external callers.
           </p>
           <button class="btn primary" onclick="connectStakeWallet()">◎ CONNECT WALLET</button>
+          <div style="margin-top:14px">
+            <div style="font-size:9px;color:var(--muted);letter-spacing:.08em;margin-bottom:6px;text-transform:uppercase">No extension? Paste any address to check</div>
+            <div style="display:flex;gap:6px">
+              <input id="stake-manual-input" placeholder="Solana wallet address…" spellcheck="false" autocomplete="off"
+                style="flex:1;background:var(--s2);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-family:inherit;font-size:11px;outline:none;letter-spacing:.02em"
+                onkeydown="if(event.key==='Enter')checkManualWallet()" oninput="this.style.borderColor='var(--border)'" />
+              <button class="btn" onclick="checkManualWallet()">CHECK</button>
+            </div>
+          </div>
         </div>
 
         <div id="stake-status-panel" style="display:none">
@@ -494,6 +503,28 @@ tr:last-child td{border-bottom:none}
       </div>
     </div>
 
+    <!-- Earnings -->
+    <div class="card mb" id="earnings-card" style="display:none">
+      <div class="card-t">EARNINGS <span class="card-t-r" id="earnings-ts">payouts ∝ stake</span></div>
+      <div class="g2">
+        <div>
+          <div class="kv"><span class="kv-k">Wallet</span><span class="kv-v" id="earn-wallet" style="font-size:9px">—</span></div>
+          <div class="kv"><span class="kv-k">CIRC Balance</span><span class="kv-v amber" id="earn-balance">—</span></div>
+          <div class="kv"><span class="kv-k">Recent Received</span><span class="kv-v green" id="earn-received">—</span></div>
+          <div id="earn-payouts" style="margin-top:12px;font-size:10px;color:var(--muted)"></div>
+          <div style="margin-top:12px">
+            <a id="earn-explorer" href="#" target="_blank" class="btn" style="font-size:10px">VIEW ON SOLSCAN ↗</a>
+          </div>
+        </div>
+        <div style="text-align:center;border-left:1px solid var(--border);padding-left:16px">
+          <div style="font-size:9px;color:var(--muted);letter-spacing:.1em;margin-bottom:8px;text-transform:uppercase">Scan to send CIRC</div>
+          <img id="earn-qr" alt="wallet QR" width="150" height="150"
+            style="width:150px;height:150px;background:#d9a441;border:1px solid var(--border);padding:4px;border-radius:2px" />
+          <div id="earn-qr-addr" style="font-size:8px;color:var(--muted);margin-top:6px;word-break:break-all;line-height:1.4"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- What staking unlocks -->
     <div class="card mb">
       <div class="card-t">What Staking Unlocks</div>
@@ -506,7 +537,7 @@ tr:last-child td{border-bottom:none}
         </div>
         <div>
           <div class="kv"><span class="kv-k">External inference callers</span><span class="kv-v amber">CIRC payment (x402)</span></div>
-          <div class="kv"><span class="kv-k">Stake-gated RPC</span><span class="kv-v amber">100,000 CIRC min</span></div>
+          <div class="kv"><span class="kv-k">Stake-gated RPC</span><span class="kv-v amber" id="unlock-min-display">—</span></div>
           <div class="kv"><span class="kv-k">Lock period</span><span class="kv-v">Determined by pool</span></div>
           <div class="kv"><span class="kv-k">Earn CIRC</span><span class="kv-v green">Via inference compute</span></div>
         </div>
@@ -1481,6 +1512,7 @@ async function loadStakeConfig() {
   $('stake-not-configured').style.display = data.configured ? 'none' : 'block';
 
   txt('stake-min-display', (data.minRequired ?? 0).toLocaleString() + ' CIRC', 'amber');
+  txt('unlock-min-display', (data.minRequired ?? 0).toLocaleString() + ' CIRC min', 'amber');
 
   const poolUrl = data.poolUrl ?? 'https://stakepoint.app';
   ['stake-pool-link', 'stake-go-link', 'stake-action-link'].forEach(id => {
@@ -1591,6 +1623,38 @@ async function refreshStake() {
   if (_stakeWallet) await checkStake(_stakeWallet);
 }
 
+// Manual wallet entry — paste any address to check stake + earnings (no extension needed).
+function checkManualWallet() {
+  const inp = $('stake-manual-input');
+  const addr = (inp?.value || '').trim();
+  if (addr.length < 32 || addr.length > 44) { if (inp) inp.style.borderColor = 'var(--red)'; return; }
+  _stakeWallet = addr;
+  try { localStorage.setItem('stake_wallet', addr); } catch {}
+  checkStake(addr);
+}
+
+// Earnings — the wallet's current CIRC balance + recent payouts received, with a scan-to-send QR.
+async function loadEarnings(wallet) {
+  if (!wallet) return;
+  const card = $('earnings-card'); if (card) card.style.display = 'block';
+  txt('earn-wallet', wallet.slice(0, 6) + '…' + wallet.slice(-6));
+  const qr = $('earn-qr'); if (qr) qr.src = `/qr?data=${encodeURIComponent(wallet)}`;
+  txt('earn-qr-addr', wallet);
+  const ex = $('earn-explorer'); if (ex) ex.href = `https://solscan.io/account/${wallet}`;
+  txt('earn-balance', '…'); txt('earn-received', '…');
+  const d = await api(`/earnings?wallet=${encodeURIComponent(wallet)}`);
+  if (!d) { txt('earn-balance', 'unavailable'); txt('earn-received', '—'); return; }
+  txt('earn-balance', (d.balance ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' CIRC');
+  txt('earn-received', '+' + (d.received ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' CIRC');
+  txt('earnings-ts', (d.payouts?.length ? `${d.payouts.length} recent` : 'no payouts yet'));
+  const box = $('earn-payouts');
+  if (box) box.innerHTML = (d.payouts || []).length
+    ? '<div style="color:var(--muted);letter-spacing:.06em;margin-bottom:4px">RECENT PAYOUTS</div>' + d.payouts.map(p =>
+        `<div class="kv" style="padding:3px 0"><span class="kv-k" style="font-size:9px">${p.ts ? new Date(p.ts).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'}</span>` +
+        `<span class="kv-v green">+${p.amount.toLocaleString(undefined,{maximumFractionDigits:2})} CIRC</span></div>`).join('')
+    : '<div style="color:var(--muted)">No payouts received yet. Stake ≥ the minimum to start earning.</div>';
+}
+
 async function checkStake(wallet) {
   if (!wallet) return;
 
@@ -1614,6 +1678,7 @@ async function checkStake(wallet) {
   const shortAddr = wallet.slice(0, 4) + '…' + wallet.slice(-4);
   txt('stake-wallet-short', shortAddr);
   txt('stake-wallet-display', shortAddr);
+  loadEarnings(wallet);
 
   const staked = data.stakedAmount ?? 0;
   const minReq = data.minRequired  ?? 0;
