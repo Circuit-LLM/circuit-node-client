@@ -8,8 +8,8 @@
 :root{
   --bg:#09080a;--s1:#110f07;--s2:#161408;--s3:#1c190a;
   --border:#3a2e00;--border2:#503e00;
-  --text:#d8cc90;--muted:#9a8c40;--dim:#2e2800;--bright:#ffe880;
-  --yellow:#ffe000;--gold:#c9a800;--amber:#ff9500;--red:#cc3333;--green:#7acc60;
+  --text:#efe4b4;--muted:#cabb7e;--dim:#5a4e1a;--bright:#ffe880;
+  --yellow:#ffe000;--gold:#dcb820;--amber:#ffa42a;--red:#ff5c5c;--green:#8ada6e;
   --font:'Courier New',Courier,monospace;
 }
 html,body{height:100%;overflow:hidden}
@@ -20,7 +20,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:12
 .hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,224,0,.2),transparent);pointer-events:none}
 .hdr-logo{display:flex;flex-direction:column;justify-content:center;padding-right:20px;border-right:1px solid var(--border2)}
 .hdr-logo-title{font-size:13px;font-weight:700;letter-spacing:.18em;color:var(--yellow);text-shadow:0 0 10px rgba(255,224,0,.6),0 0 24px rgba(255,224,0,.25)}
-.hdr-logo-sub{font-size:9px;letter-spacing:.22em;color:var(--muted);margin-top:2px;text-transform:uppercase}
+.hdr-logo-sub{font-size:10px;letter-spacing:.22em;color:var(--muted);margin-top:2px;text-transform:uppercase}
 .hdr-stats{display:flex;align-items:stretch;flex:1}
 .hstat{display:flex;flex-direction:column;justify-content:center;padding:0 18px;border-right:1px solid var(--border);cursor:default;transition:background .15s}
 .hstat:hover{background:var(--s2)}
@@ -42,7 +42,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:12
 .tab{padding:0 18px;height:36px;display:flex;align-items:center;cursor:pointer;font-size:10px;letter-spacing:.16em;color:var(--muted);border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;gap:6px;text-transform:uppercase}
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--yellow);border-bottom-color:var(--yellow)}
-.dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.6}
+.dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.9}
 .tab.active .dot{opacity:1}
 
 /* Main */
@@ -55,11 +55,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:12
 
 /* Cards */
 .card{background:var(--s1);border:1px solid var(--border);padding:14px 16px;margin-bottom:10px;position:relative;overflow:hidden}
-.card::before{content:'';position:absolute;top:0;left:0;width:8px;height:8px;border-top:1px solid var(--gold);border-left:1px solid var(--gold);opacity:.7;pointer-events:none;z-index:5}
+.card::before{content:'';position:absolute;top:0;left:0;width:8px;height:8px;border-top:1px solid var(--gold);border-left:1px solid var(--gold);opacity:.92;pointer-events:none;z-index:5}
 .card::after{content:'';position:absolute;bottom:0;right:0;width:8px;height:8px;border-bottom:1px solid var(--gold);border-right:1px solid var(--gold);opacity:.4;pointer-events:none;z-index:5}
-.card-t{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:-14px -16px 12px;padding:8px 14px;position:relative;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(90deg,var(--s2),var(--s1));border-bottom:1px solid var(--border)}
+.card-t{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:-14px -16px 12px;padding:8px 14px;position:relative;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(90deg,var(--s2),var(--s1));border-bottom:1px solid var(--border)}
 .card-t::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,224,0,.12),transparent);pointer-events:none}
-.card-t-r{font-size:9px;color:var(--muted);letter-spacing:.06em;opacity:.8}
+.card-t-r{font-size:10px;color:var(--muted);letter-spacing:.06em;opacity:.8}
 
 /* Grid */
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -95,7 +95,7 @@ tr:hover td{background:var(--s2)}
 tr:last-child td{border-bottom:none}
 
 /* Badges */
-.badge{display:inline-block;padding:2px 7px;font-size:9px;letter-spacing:.06em;border:1px solid;font-weight:700}
+.badge{display:inline-block;padding:2px 7px;font-size:10px;letter-spacing:.06em;border:1px solid;font-weight:700}
 .b-green{background:rgba(255,224,0,.06);color:var(--yellow);border-color:rgba(255,224,0,.2)}
 .b-teal{background:rgba(201,168,0,.06);color:var(--gold);border-color:rgba(201,168,0,.2)}
 .b-amber{background:rgba(255,149,0,.06);color:var(--amber);border-color:rgba(255,149,0,.2)}
@@ -106,9 +106,9 @@ tr:last-child td{border-bottom:none}
 .key-box{background:var(--s3);border:1px solid var(--border2);padding:14px 16px;font-size:11px;word-break:break-all;line-height:1.7;color:var(--bright);position:relative;cursor:pointer;transition:border-color .15s}
 .key-box:hover{border-color:var(--yellow)}
 .key-box-label{font-size:10px;letter-spacing:.14em;color:var(--muted);margin-bottom:8px;text-transform:uppercase;display:flex;justify-content:space-between}
-.copy-hint{color:var(--muted);font-size:9px;opacity:.7}
+.copy-hint{color:var(--muted);font-size:10px;opacity:.92}
 .key-box:hover .copy-hint{color:var(--yellow)}
-.key-copied{position:absolute;top:8px;right:10px;font-size:9px;color:var(--yellow);opacity:0;transition:opacity .3s}
+.key-copied{position:absolute;top:8px;right:10px;font-size:10px;color:var(--yellow);opacity:0;transition:opacity .3s}
 .key-copied.show{opacity:1}
 
 /* Status ring */
@@ -131,7 +131,7 @@ tr:last-child td{border-bottom:none}
 .log-box::-webkit-scrollbar-thumb{background:var(--border2)}
 .log-line{border-bottom:1px solid var(--dim);padding:2px 0}
 .log-line:last-child{border-bottom:none}
-.log-line .ts{color:var(--muted);opacity:.7;margin-right:8px}
+.log-line .ts{color:var(--muted);opacity:.92;margin-right:8px}
 .log-line .msg{color:var(--text)}
 .log-line.ok .msg{color:var(--yellow)}
 .log-line.warn .msg{color:var(--amber)}
@@ -141,7 +141,7 @@ tr:last-child td{border-bottom:none}
 .update-banner{background:rgba(255,149,0,.04);border:1px solid rgba(255,149,0,.2);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .update-banner h3{font-size:11px;color:var(--amber);letter-spacing:.08em}
 .update-banner p{font-size:10px;color:var(--muted);margin-top:3px}
-.btn{background:none;border:1px solid var(--border2);color:var(--muted);padding:5px 14px;cursor:pointer;font-family:var(--font);font-size:9px;letter-spacing:.1em;text-transform:uppercase;transition:all .15s}
+.btn{background:none;border:1px solid var(--border2);color:var(--muted);padding:5px 14px;cursor:pointer;font-family:var(--font);font-size:10px;letter-spacing:.1em;text-transform:uppercase;transition:all .15s}
 .btn:hover{border-color:var(--yellow);color:var(--yellow)}
 .btn.primary{border-color:var(--gold);color:var(--gold)}
 .btn.primary:hover{background:rgba(255,224,0,.06);border-color:var(--yellow);color:var(--yellow)}
@@ -150,7 +150,7 @@ tr:last-child td{border-bottom:none}
 
 /* Shard pills */
 .shard-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
-.shard-pill{padding:2px 8px;font-size:9px;letter-spacing:.08em;border:1px solid var(--border2);color:var(--gold);background:rgba(201,168,0,.04)}
+.shard-pill{padding:2px 8px;font-size:10px;letter-spacing:.08em;border:1px solid var(--border2);color:var(--gold);background:rgba(201,168,0,.04)}
 
 /* Empty */
 .empty{text-align:center;padding:40px 20px;color:var(--muted)}
@@ -169,15 +169,17 @@ tr:last-child td{border-bottom:none}
 .chat-msg{max-width:78%;padding:9px 13px;font-size:11px;line-height:1.7;border:1px solid}
 .chat-msg.user{align-self:flex-end;background:rgba(255,224,0,.03);border-color:rgba(255,224,0,.15);color:var(--bright)}
 .chat-msg.assistant{align-self:flex-start;background:var(--s2);border-color:var(--border);color:var(--text)}
-.chat-msg.system{align-self:center;background:var(--dim);border-color:var(--border);color:var(--muted);font-size:9px;letter-spacing:.08em;max-width:95%;text-align:center}
+.chat-msg.system{align-self:center;background:var(--dim);border-color:var(--border);color:var(--muted);font-size:10px;letter-spacing:.08em;max-width:95%;text-align:center}
 .chat-msg.error{align-self:flex-start;background:rgba(204,51,51,.04);border-color:rgba(204,51,51,.25);color:var(--red)}
+.infer-example{font-size:11px;color:var(--text);background:var(--s2);border:1px solid var(--border);padding:11px 14px;cursor:pointer;transition:border-color .15s,color .15s,background .15s;text-align:left;line-height:1.55}
+.infer-example:hover{border-color:var(--gold);color:var(--bright);background:var(--s3)}
 .chat-cursor{display:inline-block;width:6px;height:11px;background:var(--yellow);margin-left:2px;animation:blink .7s step-end infinite;vertical-align:text-bottom}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 .chat-bar{background:var(--s1);border-top:1px solid var(--border2);padding:10px 14px;display:flex;gap:8px;flex-shrink:0}
 .chat-input{flex:1;background:var(--s3);border:1px solid var(--border2);color:var(--bright);padding:8px 12px;font-family:var(--font);font-size:11px;outline:none;resize:none;height:38px;line-height:1.5}
 .chat-input:focus{border-color:var(--yellow)}
 .chat-input::placeholder{color:var(--muted)}
-.chat-send{background:none;border:1px solid var(--border2);color:var(--muted);padding:0 16px;cursor:pointer;font-family:var(--font);font-size:9px;letter-spacing:.1em;text-transform:uppercase;transition:all .15s;height:38px}
+.chat-send{background:none;border:1px solid var(--border2);color:var(--muted);padding:0 16px;cursor:pointer;font-family:var(--font);font-size:10px;letter-spacing:.1em;text-transform:uppercase;transition:all .15s;height:38px}
 .chat-send:hover{border-color:var(--yellow);color:var(--yellow)}
 .chat-send:disabled{opacity:.35;cursor:default}
 .chat-status-bar{font-size:10px;color:var(--muted);padding:4px 18px;background:var(--s1);border-top:1px solid var(--dim);letter-spacing:.06em;flex-shrink:0}
@@ -190,7 +192,7 @@ tr:last-child td{border-bottom:none}
 .stake-access-status.unlocked{color:var(--yellow);text-shadow:0 0 10px rgba(255,224,0,.35)}
 .stake-access-status.locked{color:var(--red)}
 .stake-access-status.checking{color:var(--muted)}
-.stake-wallet-tag{font-size:9px;color:var(--muted);letter-spacing:.06em;background:var(--s2);border:1px solid var(--border);padding:3px 8px;cursor:pointer;transition:border-color .15s}
+.stake-wallet-tag{font-size:10px;color:var(--muted);letter-spacing:.06em;background:var(--s2);border:1px solid var(--border);padding:3px 8px;cursor:pointer;transition:border-color .15s}
 .stake-wallet-tag:hover{border-color:var(--border2);color:var(--text)}
 .stake-progress{height:3px;background:var(--dim);margin-bottom:14px;overflow:hidden}
 .stake-progress-fill{height:100%;background:var(--yellow);transition:width .4s;box-shadow:0 0 6px rgba(255,224,0,.4)}
@@ -265,7 +267,7 @@ tr:last-child td{border-bottom:none}
 
       <div class="card">
         <div class="card-t">Node Identity</div>
-        <div class="kv"><span class="kv-k">Node ID</span><span class="kv-v" id="ov-nodeid" style="font-size:9px">—</span></div>
+        <div class="kv"><span class="kv-k">Node ID</span><span class="kv-v" id="ov-nodeid" style="font-size:10px">—</span></div>
         <div class="kv"><span class="kv-k">Version</span><span class="kv-v" id="ov-version">—</span></div>
         <div class="kv"><span class="kv-k">Region</span><span class="kv-v" id="ov-region">—</span></div>
         <div class="kv"><span class="kv-k">API Port</span><span class="kv-v" id="ov-port">—</span></div>
@@ -333,7 +335,7 @@ tr:last-child td{border-bottom:none}
   <!-- ── RPC KEY ── -->
   <section class="panel" id="panel-rpc">
     <div class="card mb" style="opacity:.5;pointer-events:none">
-      <div class="card-t">RPC API Key <span style="font-size:9px;color:var(--yellow);letter-spacing:.08em;margin-left:8px">COMING SOON</span></div>
+      <div class="card-t">RPC API Key <span style="font-size:10px;color:var(--yellow);letter-spacing:.08em;margin-left:8px">COMING SOON</span></div>
       <p style="font-size:11px;color:var(--muted);line-height:1.8;margin-bottom:14px">
         Network RPC key issuance is not yet active. This feature will be enabled in a future release.
       </p>
@@ -398,11 +400,11 @@ tr:last-child td{border-bottom:none}
     <!-- Status hero bar -->
     <div style="background:var(--s2);border:1px solid var(--border);padding:16px 18px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px">
       <div>
-        <div style="font-size:9px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Access Status</div>
+        <div style="font-size:10px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Access Status</div>
         <div class="stake-access-status checking" id="stake-access-label">CHECKING…</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:9px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Wallet</div>
+        <div style="font-size:10px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Wallet</div>
         <div id="stake-wallet-display" style="font-size:11px;color:var(--muted)">Not connected</div>
       </div>
     </div>
@@ -415,7 +417,7 @@ tr:last-child td{border-bottom:none}
     <!-- Not configured banner -->
     <div id="stake-not-configured" style="display:none;margin-bottom:10px">
       <div style="background:rgba(255,149,0,.04);border:1px solid rgba(255,149,0,.18);padding:10px 14px;display:flex;align-items:center;gap:10px">
-        <span style="font-size:9px;letter-spacing:.12em;color:var(--amber);background:rgba(255,149,0,.08);border:1px solid rgba(255,149,0,.2);padding:2px 8px;white-space:nowrap">POOL PENDING</span>
+        <span style="font-size:10px;letter-spacing:.12em;color:var(--amber);background:rgba(255,149,0,.08);border:1px solid rgba(255,149,0,.2);padding:2px 8px;white-space:nowrap">POOL PENDING</span>
         <span style="font-size:10px;color:var(--muted)">Staking pool not yet configured in <code style="color:var(--green)">config/client.json</code>. Add <code style="color:var(--green)">access.stakingPool</code> to enable on-chain stake verification.</span>
       </div>
     </div>
@@ -431,7 +433,7 @@ tr:last-child td{border-bottom:none}
           </p>
           <button class="btn primary" onclick="connectStakeWallet()">◎ CONNECT WALLET</button>
           <div style="margin-top:14px">
-            <div style="font-size:9px;color:var(--muted);letter-spacing:.08em;margin-bottom:6px;text-transform:uppercase">No extension? Paste any address to check</div>
+            <div style="font-size:10px;color:var(--muted);letter-spacing:.08em;margin-bottom:6px;text-transform:uppercase">No extension? Paste any address to check</div>
             <div style="display:flex;gap:6px">
               <input id="stake-manual-input" placeholder="Solana wallet address…" spellcheck="false" autocomplete="off"
                 style="flex:1;background:var(--s2);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-family:inherit;font-size:11px;outline:none;letter-spacing:.02em"
@@ -460,7 +462,7 @@ tr:last-child td{border-bottom:none}
           </div>
           <div class="kv">
             <span class="kv-k">Position Address</span>
-            <span class="kv-v" id="stake-position-display" style="font-size:9px">—</span>
+            <span class="kv-v" id="stake-position-display" style="font-size:10px">—</span>
           </div>
           <div class="kv" style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px">
             <span class="kv-k">Wallet</span>
@@ -488,13 +490,13 @@ tr:last-child td{border-bottom:none}
             style="color:var(--gold);text-decoration:none">stakepoint.app ↗</a></span>
         </div>
         <div class="kv"><span class="kv-k">Pool Address</span>
-          <span class="kv-v" id="stake-pool-address" style="font-size:9px;color:var(--muted)">not configured</span>
+          <span class="kv-v" id="stake-pool-address" style="font-size:10px;color:var(--muted)">not configured</span>
         </div>
         <div class="kv"><span class="kv-k">Token</span>
-          <span class="kv-v" style="font-size:9px">CIRC · 8fQg…pump</span>
+          <span class="kv-v" style="font-size:10px">CIRC · 8fQg…pump</span>
         </div>
         <div class="kv"><span class="kv-k">Config key</span>
-          <span class="kv-v" style="font-size:9px;color:var(--muted)">access.stakingPool</span>
+          <span class="kv-v" style="font-size:10px;color:var(--muted)">access.stakingPool</span>
         </div>
         <div style="margin-top:14px">
           <a id="stake-go-link" href="https://stakepoint.app" target="_blank" class="btn primary">STAKE CIRC ↗</a>
@@ -508,7 +510,7 @@ tr:last-child td{border-bottom:none}
       <div class="card-t">EARNINGS <span class="card-t-r" id="earnings-ts">payouts ∝ stake</span></div>
       <div class="g2">
         <div>
-          <div class="kv"><span class="kv-k">Wallet</span><span class="kv-v" id="earn-wallet" style="font-size:9px">—</span></div>
+          <div class="kv"><span class="kv-k">Wallet</span><span class="kv-v" id="earn-wallet" style="font-size:10px">—</span></div>
           <div class="kv"><span class="kv-k">CIRC Balance</span><span class="kv-v amber" id="earn-balance">—</span></div>
           <div class="kv"><span class="kv-k">Recent Received</span><span class="kv-v green" id="earn-received">—</span></div>
           <div id="earn-payouts" style="margin-top:12px;font-size:10px;color:var(--muted)"></div>
@@ -517,7 +519,7 @@ tr:last-child td{border-bottom:none}
           </div>
         </div>
         <div style="text-align:center;border-left:1px solid var(--border);padding-left:16px">
-          <div style="font-size:9px;color:var(--muted);letter-spacing:.1em;margin-bottom:8px;text-transform:uppercase">Scan to send CIRC</div>
+          <div style="font-size:10px;color:var(--muted);letter-spacing:.1em;margin-bottom:8px;text-transform:uppercase">Scan to send CIRC</div>
           <img id="earn-qr" alt="wallet QR" width="150" height="150"
             style="width:150px;height:150px;background:#d9a441;border:1px solid var(--border);padding:4px;border-radius:2px" />
           <div id="earn-qr-addr" style="font-size:8px;color:var(--muted);margin-top:6px;word-break:break-all;line-height:1.4"></div>
@@ -549,19 +551,19 @@ tr:last-child td{border-bottom:none}
       <div class="card-t">How to Stake</div>
       <div style="display:flex;flex-direction:column;gap:10px;font-size:11px;line-height:1.7">
         <div style="display:flex;gap:12px;align-items:flex-start">
-          <span style="width:20px;height:20px;border:1px solid var(--border2);color:var(--gold);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</span>
+          <span style="width:20px;height:20px;border:1px solid var(--border2);color:var(--gold);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</span>
           <span style="color:var(--muted)">Get CIRC tokens on <a href="https://stakepoint.app" target="_blank" style="color:var(--gold);text-decoration:none">stakepoint.app</a> or any Solana DEX. Mint: <code style="color:var(--green)">8fQgfsRnRkKSeNUhevT7wp8mhNvMSJdLn1fJi4oVpump</code></span>
         </div>
         <div style="display:flex;gap:12px;align-items:flex-start">
-          <span style="width:20px;height:20px;border:1px solid var(--border2);color:var(--gold);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</span>
+          <span style="width:20px;height:20px;border:1px solid var(--border2);color:var(--gold);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</span>
           <span style="color:var(--muted)">Go to <a href="https://stakepoint.app" target="_blank" style="color:var(--gold);text-decoration:none">stakepoint.app</a> and stake into the Circuit pool. Copy the pool address.</span>
         </div>
         <div style="display:flex;gap:12px;align-items:flex-start">
-          <span style="width:20px;height:20px;border:1px solid var(--border2);color:var(--gold);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</span>
+          <span style="width:20px;height:20px;border:1px solid var(--border2);color:var(--gold);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</span>
           <span style="color:var(--muted)">Add the pool address to your node config: <code style="color:var(--green)">access.stakingPool</code> in <code style="color:var(--green)">config/client.json</code>. Restart your node.</span>
         </div>
         <div style="display:flex;gap:12px;align-items:flex-start">
-          <span style="width:20px;height:20px;border:1px solid var(--border2);color:var(--gold);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">4</span>
+          <span style="width:20px;height:20px;border:1px solid var(--border2);color:var(--gold);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">4</span>
           <span style="color:var(--muted)">Connect your wallet above and verify your stake. External callers with the correct API key can now access your node's RPC endpoints.</span>
         </div>
       </div>
@@ -695,7 +697,7 @@ tr:last-child td{border-bottom:none}
           <button class="btn" id="dllm-w-restartbtn" onclick="dllmWorker('restart')" style="display:none">↻ RESTART</button>
           <button class="btn" id="dllm-w-stopbtn" onclick="dllmWorker('stop')" style="display:none;color:var(--red);border-color:var(--red)">■ STOP</button>
         </div>
-        <div id="dllm-w-ctrl-note" style="margin-top:8px;font-size:9px;color:var(--muted);display:none">Worker control is local-only. For a remote node, tunnel first: <code style="color:var(--green)">ssh -L PORT:localhost:PORT</code></div>
+        <div id="dllm-w-ctrl-note" style="margin-top:8px;font-size:10px;color:var(--muted);display:none">Worker control is local-only. For a remote node, tunnel first: <code style="color:var(--green)">ssh -L PORT:localhost:PORT</code></div>
         <div id="dllm-w-enable" style="margin-top:12px;display:none">
           <p style="font-size:11px;color:var(--muted);line-height:1.7">This node isn't contributing GPU compute. To serve model layers and earn CIRC, run on a GPU box and set
             <code style="color:var(--green)">llmWorker.enabled: true</code> in <code style="color:var(--green)">config/client.json</code>.</p>
@@ -704,7 +706,7 @@ tr:last-child td{border-bottom:none}
     </div>
 
     <div class="card mb">
-      <div class="card-t">MESH TOPOLOGY <span id="dllm-mesh-sub" style="float:right;color:var(--muted);font-size:9px;letter-spacing:.06em"></span></div>
+      <div class="card-t">MESH TOPOLOGY <span id="dllm-mesh-sub" style="float:right;color:var(--muted);font-size:10px;letter-spacing:.06em"></span></div>
       <div id="dllm-mesh-slots" style="font-size:11px;color:var(--muted)">Loading mesh…</div>
     </div>
 
@@ -723,15 +725,26 @@ tr:last-child td{border-bottom:none}
     <div style="background:var(--s2);border-bottom:1px solid var(--border2);padding:6px 16px;display:flex;align-items:center;gap:10px;font-size:10px;flex-shrink:0">
       <div id="infer-dot" style="width:6px;height:6px;border-radius:50%;background:var(--dim);flex-shrink:0;transition:background .3s"></div>
       <span id="infer-status-text" style="color:var(--muted);letter-spacing:.06em">Connecting to inference coordinator…</span>
-      <span id="infer-model-label" style="margin-left:auto;color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.7">CIRCUIT NETWORK</span>
+      <span id="infer-model-label" style="margin-left:auto;color:var(--muted);font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.92">CIRCUIT NETWORK</span>
     </div>
     <div class="chat-wrap">
       <div class="chat-messages" id="infer-messages">
-        <div class="chat-msg system">Decentralized inference via the CIRCUIT worker mesh.</div>
+        <div id="infer-welcome" style="max-width:600px;margin:36px auto;text-align:center;padding:0 16px">
+          <div style="font-size:16px;color:var(--bright);letter-spacing:.04em;margin-bottom:12px">Decentralized 72B Inference</div>
+          <div style="font-size:12px;color:var(--text);line-height:1.85;margin-bottom:26px">
+            You're chatting with <strong style="color:var(--bright)">Qwen2.5-72B</strong> running across the CIRCUIT worker mesh — no single machine holds the whole model. It's free while a coordinator runs on this host; otherwise calls are metered in CIRC.
+          </div>
+          <div style="font-size:10px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px">Try one of these</div>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <div class="infer-example" onclick="inferExample(this)">Explain how a distributed LLM splits a model across nodes.</div>
+            <div class="infer-example" onclick="inferExample(this)">Write a short haiku about decentralized compute.</div>
+            <div class="infer-example" onclick="inferExample(this)">What's the difference between staking CIRC and running a node?</div>
+          </div>
+        </div>
       </div>
       <div class="chat-status-bar">
         <span id="infer-info-label" style="color:var(--muted)">CIRCUIT Decentralized LLM</span>
-        <span style="float:right;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;font-size:9px" onclick="inferClear()" title="Clear conversation">CLEAR</span>
+        <span style="float:right;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;font-size:10px" onclick="inferClear()" title="Clear conversation">CLEAR</span>
       </div>
       <div class="chat-bar">
         <textarea class="chat-input" id="infer-input" placeholder="Chat with the decentralized inference network…" rows="1"
@@ -1656,7 +1669,7 @@ async function loadEarnings(wallet) {
   const box = $('earn-payouts');
   if (box) box.innerHTML = (d.payouts || []).length
     ? '<div style="color:var(--muted);letter-spacing:.06em;margin-bottom:4px">RECENT PAYOUTS</div>' + d.payouts.map(p =>
-        `<div class="kv" style="padding:3px 0"><span class="kv-k" style="font-size:9px">${p.ts ? new Date(p.ts).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'}</span>` +
+        `<div class="kv" style="padding:3px 0"><span class="kv-k" style="font-size:10px">${p.ts ? new Date(p.ts).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'}</span>` +
         `<span class="kv-v green">+${p.amount.toLocaleString(undefined,{maximumFractionDigits:2})} CIRC</span></div>`).join('')
     : '<div style="color:var(--muted)">No payouts received yet. Stake ≥ the minimum to start earning.</div>';
 }
@@ -1845,12 +1858,19 @@ async function _inferCheckStatus() {
   }
 }
 
+function inferExample(el) {
+  const input = $('infer-input');
+  if (input) { input.value = el.textContent.trim(); input.focus(); }
+  inferSend();
+}
+
 async function inferSend() {
   if (inferPending) return;
   const input = $('infer-input');
   const text  = (input?.value ?? '').trim();
   if (!text) return;
 
+  const welcome = $('infer-welcome'); if (welcome) welcome.remove();
   input.value = '';
   input.style.height = '';
   inferPending = true;
