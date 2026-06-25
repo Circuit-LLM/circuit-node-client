@@ -485,6 +485,10 @@ tr:last-child td{border-bottom:none}
       <div class="card">
         <div class="card-t">Pool Configuration</div>
         <div class="kv"><span class="kv-k">Min. Required</span><span class="kv-v amber" id="stake-min-display">—</span></div>
+        <div style="font-size:10px;color:var(--muted);line-height:1.6;margin:2px 0 8px;padding:7px 10px;background:var(--s2);border:1px solid var(--border)">
+          ⓘ StakePoint deducts a <strong style="color:var(--text)">2% fee</strong> on staking — stake about
+          <strong style="color:var(--bright)" id="stake-gross-hint">5,000,000</strong> CIRC so the net cleared after the fee meets the minimum above.
+        </div>
         <div class="kv"><span class="kv-k">Pool</span>
           <span class="kv-v"><a id="stake-pool-link" href="https://stakepoint.app" target="_blank"
             style="color:var(--gold);text-decoration:none">stakepoint.app ↗</a></span>
@@ -1532,6 +1536,8 @@ async function loadStakeConfig() {
 
   txt('stake-min-display', (data.minRequired ?? 0).toLocaleString() + ' CIRC', 'amber');
   txt('unlock-min-display', (data.minRequired ?? 0).toLocaleString() + ' CIRC min', 'amber');
+  // gross stake needed to clear the (net) minimum after the 2% pool fee
+  txt('stake-gross-hint', Math.ceil((data.minRequired ?? 0) / 0.98).toLocaleString());
 
   const poolUrl = data.poolUrl ?? 'https://stakepoint.app';
   ['stake-pool-link', 'stake-go-link', 'stake-action-link'].forEach(id => {
