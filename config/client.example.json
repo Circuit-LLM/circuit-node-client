@@ -44,8 +44,8 @@
   "updates": {
     "autoUpdate": true,
     "checkIntervalMs": 3600000,
-    "signingPublicKey": null,
-    "_signingNote": "Operator public key for verifying signed updates. Set by generate-signing-key.js output. Leave null to skip verification (not recommended for production)."
+    "signingPublicKey": "MCowBQYDK2VwAyEAFzmYloui3L4oqUzzxY3KiKLGXk77QMoQGLs9zS7jHW0=",
+    "_signingNote": "Official Circuit LLM update-signing public key. The updater verifies every signed package against this before applying. This is a PUBLIC key (safe to ship); the matching private key never leaves the publisher."
   },
   "chat": {
     "maxHistory": 20,
