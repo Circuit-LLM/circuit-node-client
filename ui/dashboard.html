@@ -703,9 +703,52 @@ tr:last-child td{border-bottom:none}
           <button class="btn" id="dllm-w-stopbtn" onclick="dllmWorker('stop')" style="display:none;color:var(--red);border-color:var(--red)">■ STOP</button>
         </div>
         <div id="dllm-w-ctrl-note" style="margin-top:8px;font-size:10px;color:var(--muted);display:none">Worker control is local-only. For a remote node, tunnel first: <code style="color:var(--green)">ssh -L PORT:localhost:PORT</code></div>
+        <!-- ── Connect GPU (friendly one-click) ── -->
+        <style>
+        .connect-presets{display:flex;gap:8px;margin:10px 0}
+        .preset{flex:1;background:#0e0c06;border:1px solid #3a2e00;border-radius:6px;padding:10px 8px;cursor:pointer;text-align:center;transition:all .15s}
+        .preset:hover{border-color:#7a6e30}
+        .preset.sel{border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset}
+        .preset .pn{font-size:11px;letter-spacing:.1em;color:#d8cc90;font-weight:700}
+        .preset .pd{font-size:9px;color:var(--muted);margin-top:3px;line-height:1.4}
+        .adv-toggle{font-size:10px;letter-spacing:.08em;color:var(--muted);cursor:pointer;margin:6px 0;user-select:none}
+        .adv-toggle:hover{color:#d8cc90}
+        .adv-row{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:10px;color:var(--muted)}
+        .adv-row label{flex:0 0 90px;letter-spacing:.06em}
+        .adv-row input[type=range]{flex:1;accent-color:var(--green)}
+        .adv-row .av{flex:0 0 56px;text-align:right;color:#d8cc90;font-size:11px}
+        .connect-wallet{width:100%;background:#09080a;border:1px solid #3a2e00;color:#d8cc90;font-family:inherit;font-size:11px;padding:9px 10px;border-radius:6px;outline:none;margin:8px 0}
+        .connect-wallet:focus{border-color:var(--green)}
+        .muted-note{font-size:11px;color:var(--muted);line-height:1.7}
+        </style>
         <div id="dllm-w-enable" style="margin-top:12px;display:none">
-          <p style="font-size:11px;color:var(--muted);line-height:1.7">This node isn't contributing GPU compute. To serve model layers and earn CIRC, run on a GPU box and set
-            <code style="color:var(--green)">llmWorker.enabled: true</code> in <code style="color:var(--green)">config/client.json</code>.</p>
+          <!-- state A: no GPU on this box -->
+          <div id="gpu-nogpu" style="display:none">
+            <p class="muted-note">No NVIDIA GPU detected on this box. GPU contribution serves model layers to the network and earns CIRC — run the node-client on a GPU machine, then this panel turns into a one-click <strong>Connect GPU</strong>.</p>
+          </div>
+          <!-- state B: GPU present but engine not installed → guided setup -->
+          <div id="gpu-setup" style="display:none">
+            <p class="muted-note">GPU detected: <strong id="gpu-name" style="color:var(--green)"></strong>. The inference engine isn't installed on this box yet — it serves the model layers your GPU will hold.</p>
+            <button class="btn primary" onclick="setupGpu()" style="margin-top:8px">⬇ SET UP GPU COMPUTE (one-time)</button>
+            <div id="gpu-setup-note" class="muted-note" style="margin-top:6px"></div>
+          </div>
+          <!-- state C: ready to connect -->
+          <div id="gpu-form" style="display:none">
+            <p class="muted-note">Lend <strong id="gpu-name2" style="color:var(--green)"></strong> to the network — serve model layers, earn CIRC. Pick how much of the GPU to contribute:</p>
+            <div class="connect-presets">
+              <div class="preset" id="gpu-pre-light"    onclick="pickPreset('gpu','light')"><div class="pn">LIGHT</div><div class="pd" id="gpu-p-light">—</div></div>
+              <div class="preset sel" id="gpu-pre-balanced" onclick="pickPreset('gpu','balanced')"><div class="pn">BALANCED</div><div class="pd" id="gpu-p-balanced">—</div></div>
+              <div class="preset" id="gpu-pre-max"      onclick="pickPreset('gpu','max')"><div class="pn">MAX</div><div class="pd" id="gpu-p-max">—</div></div>
+            </div>
+            <div class="adv-toggle" onclick="toggleAdv('gpu')"><span id="gpu-adv-caret">▸</span> Advanced</div>
+            <div id="gpu-adv" style="display:none">
+              <div class="adv-row"><label>Layers to serve</label><input type="range" id="gpu-cap" min="4" max="80" step="1" oninput="onAdv('gpu')"><span class="av" id="gpu-cap-av">—</span></div>
+              <div class="muted-note" style="font-size:9px">More layers = more VRAM used + more of the model served + more earnings.</div>
+            </div>
+            <input class="connect-wallet" id="gpu-wallet" type="text" placeholder="Payout wallet (Solana address for CIRC earnings)" spellcheck="false">
+            <button class="btn primary" onclick="connectGpu()" style="width:100%">⚡ CONNECT GPU</button>
+            <div id="gpu-connect-note" class="muted-note" style="margin-top:6px"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -835,17 +878,35 @@ tr:last-child td{border-bottom:none}
   <!-- ── CLOUD: this node's contribution to the agent cloud (CPU hosting) ── -->
   <section class="panel" id="panel-cloud">
     <div id="cloud-disabled-msg" class="card mb" style="display:none">
-      <div class="card-t">Not Contributing CPU</div>
-      <p style="font-size:11px;color:var(--muted);line-height:1.8">
-        This node isn't hosting agents for the <strong>Circuit agent cloud</strong> yet. Lend spare CPU to run
-        other users' autonomous agents — opt-in, bounded, revocable:
-        <br><br>
-        <code style="color:var(--green)">circuit agent host --max-agents 20</code>
-        <br><br>
-        Inference runs on the GPUs; agents run on the CPUs that hang off the same node. Every agent's signing key
-        stays <strong>off-box</strong> in the signer — your machine only ever runs the agent's compute and never
-        holds a user's key. <code style="color:var(--green)">circuit agent host --off</code> drains &amp; stops.
+      <div class="card-t">Lend CPU to the Agent Cloud</div>
+      <p class="muted-note" style="margin-bottom:6px">
+        Host other users' autonomous agents on spare CPU — opt-in, bounded, revocable. Every agent's signing key
+        stays <strong>off-box</strong> in the signer; your machine only runs the agent's compute, never holds a key.
       </p>
+      <!-- state A: node-host code not installed → guided setup -->
+      <div id="cpu-setup" style="display:none">
+        <p class="muted-note">The agent-host runtime isn't installed on this box yet.</p>
+        <button class="btn primary" onclick="setupCpu()" style="margin-top:8px">⬇ SET UP CPU HOSTING (one-time)</button>
+        <div id="cpu-setup-note" class="muted-note" style="margin-top:6px"></div>
+      </div>
+      <!-- state B: ready to connect -->
+      <div id="cpu-form" style="display:none">
+        <p class="muted-note" style="margin-top:6px">Pick how much of this machine (<span id="cpu-machine" style="color:var(--green)"></span>) to lend:</p>
+        <div class="connect-presets">
+          <div class="preset" id="cpu-pre-light"    onclick="pickPreset('cpu','light')"><div class="pn">LIGHT</div><div class="pd" id="cpu-p-light">—</div></div>
+          <div class="preset sel" id="cpu-pre-balanced" onclick="pickPreset('cpu','balanced')"><div class="pn">BALANCED</div><div class="pd" id="cpu-p-balanced">—</div></div>
+          <div class="preset" id="cpu-pre-max"      onclick="pickPreset('cpu','max')"><div class="pn">MAX</div><div class="pd" id="cpu-p-max">—</div></div>
+        </div>
+        <div class="adv-toggle" onclick="toggleAdv('cpu')"><span id="cpu-adv-caret">▸</span> Advanced</div>
+        <div id="cpu-adv" style="display:none">
+          <div class="adv-row"><label>Max agents</label><input type="range" id="cpu-agents" min="1" max="20" step="1" oninput="onAdv('cpu')"><span class="av" id="cpu-agents-av">—</span></div>
+          <div class="adv-row"><label>CPU cores</label><input type="range" id="cpu-cores" min="1" max="64" step="1" oninput="onAdv('cpu')"><span class="av" id="cpu-cores-av">—</span></div>
+          <div class="adv-row"><label>RAM / agent</label><input type="range" id="cpu-ram" min="256" max="4096" step="128" oninput="onAdv('cpu')"><span class="av" id="cpu-ram-av">—</span></div>
+        </div>
+        <input class="connect-wallet" id="cpu-wallet" type="text" placeholder="Payout wallet (Solana address for CIRC earnings)" spellcheck="false">
+        <button class="btn primary" onclick="connectCpu()" style="width:100%">⚡ CONNECT CPU</button>
+        <div id="cpu-connect-note" class="muted-note" style="margin-top:6px"></div>
+      </div>
     </div>
 
     <div id="cloud-content" style="display:none">
@@ -943,10 +1004,10 @@ function showTab(id) {
   if (id === 'network')    renderNetwork();
   if (id === 'updates')    renderUpdates();
   if (id === 'agent')      { loadAgentData(); }
-  if (id === 'cloud')      loadCloudData();
+  if (id === 'cloud')      { loadCloudData(); loadSetup(); }
   if (id === 'chat')       renderChat();
   if (id === 'inference')  renderInference();
-  if (id === 'dllm')       loadDllmInfo();
+  if (id === 'dllm')       { loadDllmInfo(); loadSetup(); }
   if (id === 'staking')    loadStakeConfig();
   if (id === 'rpc')        _refreshRpcStakeSummary();
 }
@@ -1955,6 +2016,95 @@ async function dllmWorker(action) {
     if (btnNote) { btnNote.textContent = 'cannot reach node: ' + e.message; btnNote.style.color = 'var(--red)'; }
   }
 }
+// ── Connect GPU / CPU (one-click compute contribution) ──────────────────────
+let _setup = null;
+const _sel = { gpu: 'balanced', cpu: 'balanced' };
+
+async function loadSetup() {
+  try { const r = await fetch(`${BASE}/setup/status`); if (r.ok) { _setup = await r.json(); renderConnect(); } } catch {}
+}
+function renderConnect() { if (!_setup) return; renderConnectGpu(_setup.gpu || {}); renderConnectCpu(_setup.cpu || {}); }
+function _show(id, on) { const e = $(id); if (e) e.style.display = on ? '' : 'none'; }
+
+function renderConnectGpu(g) {
+  _show('gpu-nogpu', !g.present);
+  _show('gpu-setup', g.present && !g.enginePresent);
+  _show('gpu-form',  g.present && g.enginePresent);
+  if (g.info) { txt('gpu-name', `${g.info.name} · ${Math.round((g.info.vramMb || 0) / 1024)}GB`); txt('gpu-name2', g.info.name); }
+  const p = g.presets || {};
+  txt('gpu-p-light', `${p.light ?? '—'} layers`); txt('gpu-p-balanced', `${p.balanced ?? '—'} layers`); txt('gpu-p-max', `${p.max ?? '—'} layers`);
+  const cap = $('gpu-cap');
+  if (cap) { cap.max = p.fit || 80; cap.value = p[_sel.gpu] || p.balanced || 40; txt('gpu-cap-av', `${cap.value} L`); }
+  if (g.payoutWallet && $('gpu-wallet') && !$('gpu-wallet').value) $('gpu-wallet').value = g.payoutWallet;
+}
+function renderConnectCpu(c) {
+  _show('cpu-setup', !c.hostPresent); _show('cpu-form', c.hostPresent);
+  const p = c.presets || {}, m = p.machine || {};
+  txt('cpu-machine', `${m.cores ?? '?'} cores · ${Math.round((m.ramMb || 0) / 1024)}GB`);
+  const desc = b => b ? `${b.maxAgents} agents · ${b.maxCpu} cores` : '—';
+  txt('cpu-p-light', desc(p.light)); txt('cpu-p-balanced', desc(p.balanced)); txt('cpu-p-max', desc(p.max));
+  const b = p[_sel.cpu] || p.balanced || {};
+  const ag = $('cpu-agents'), co = $('cpu-cores'), ra = $('cpu-ram');
+  if (co) co.max = m.cores || 64;
+  if (ag && b.maxAgents)    { ag.value = b.maxAgents;    txt('cpu-agents-av', ag.value); }
+  if (co && b.maxCpu)       { co.value = b.maxCpu;       txt('cpu-cores-av', co.value); }
+  if (ra && b.maxMemoryMb)  { ra.value = b.maxMemoryMb;  txt('cpu-ram-av', `${(ra.value / 1024).toFixed(1)}G`); }
+  if (c.payoutWallet && $('cpu-wallet') && !$('cpu-wallet').value) $('cpu-wallet').value = c.payoutWallet;
+}
+function pickPreset(kind, name) {
+  _sel[kind] = name;
+  ['light', 'balanced', 'max'].forEach(n => { const e = $(`${kind}-pre-${n}`); if (e) e.classList.toggle('sel', n === name); });
+  if (kind === 'gpu') { const p = _setup?.gpu?.presets || {}, cap = $('gpu-cap'); if (cap && p[name]) { cap.value = p[name]; txt('gpu-cap-av', `${cap.value} L`); } }
+  else { const b = (_setup?.cpu?.presets || {})[name] || {}, ag = $('cpu-agents'), co = $('cpu-cores'), ra = $('cpu-ram');
+    if (ag && b.maxAgents) { ag.value = b.maxAgents; txt('cpu-agents-av', ag.value); }
+    if (co && b.maxCpu) { co.value = b.maxCpu; txt('cpu-cores-av', co.value); }
+    if (ra && b.maxMemoryMb) { ra.value = b.maxMemoryMb; txt('cpu-ram-av', `${(ra.value / 1024).toFixed(1)}G`); } }
+}
+function toggleAdv(kind) { const a = $(`${kind}-adv`); const on = a.style.display === 'none'; a.style.display = on ? 'block' : 'none'; txt(`${kind}-adv-caret`, on ? '▾' : '▸'); }
+function onAdv(kind) {
+  ['light', 'balanced', 'max'].forEach(n => { const e = $(`${kind}-pre-${n}`); if (e) e.classList.remove('sel'); });
+  _sel[kind] = null;
+  if (kind === 'gpu') txt('gpu-cap-av', `${$('gpu-cap').value} L`);
+  else { txt('cpu-agents-av', $('cpu-agents').value); txt('cpu-cores-av', $('cpu-cores').value); txt('cpu-ram-av', `${($('cpu-ram').value / 1024).toFixed(1)}G`); }
+}
+async function connectGpu() {
+  const note = $('gpu-connect-note'); note.style.color = 'var(--muted)'; note.textContent = 'connecting…';
+  const body = _sel.gpu ? { preset: _sel.gpu } : { capacityLayers: Number($('gpu-cap').value) };
+  const w = $('gpu-wallet').value.trim(); if (w) body.payoutWallet = w;
+  try {
+    const r = await fetch('/dllm/worker/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { note.style.color = 'var(--red)'; note.textContent = d.message || d.error || 'connect failed'; if (d.setup === 'gpu') loadSetup(); return; }
+    note.style.color = 'var(--green)'; note.textContent = `connected — serving ~${d.capacityLayers} layers. Loading model…`;
+    setTimeout(() => { loadDllmInfo(); loadSetup(); }, 1500);
+  } catch (e) { note.style.color = 'var(--red)'; note.textContent = 'cannot reach node: ' + e.message; }
+}
+async function connectCpu() {
+  const note = $('cpu-connect-note'); note.style.color = 'var(--muted)'; note.textContent = 'connecting…';
+  const body = _sel.cpu ? { preset: _sel.cpu } : { maxAgents: Number($('cpu-agents').value), maxCpu: Number($('cpu-cores').value), maxMemoryMb: Number($('cpu-ram').value) };
+  const w = $('cpu-wallet').value.trim(); if (w) body.payoutWallet = w;
+  try {
+    const r = await fetch('/cloud/host/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { note.style.color = 'var(--red)'; note.textContent = d.error === 'node-host-missing' ? 'agent-host not installed — run setup above' : (d.error || 'connect failed'); if (d.error === 'node-host-missing') loadSetup(); return; }
+    note.style.color = 'var(--green)'; note.textContent = `connected — hosting up to ${d.budget?.maxAgents} agents.`;
+    setTimeout(() => { loadCloudData(); loadSetup(); }, 1500);
+  } catch (e) { note.style.color = 'var(--red)'; note.textContent = 'cannot reach node: ' + e.message; }
+}
+async function setupCpu() {
+  const note = $('cpu-setup-note'); note.style.color = 'var(--muted)'; note.textContent = 'installing…';
+  try {
+    const r = await fetch('/setup/install/cpu', { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) { note.style.color = 'var(--red)'; note.textContent = d.hint || d.error || 'setup failed'; return; }
+    note.style.color = 'var(--green)'; note.textContent = 'installed.'; loadSetup();
+  } catch (e) { note.style.color = 'var(--red)'; note.textContent = e.message; }
+}
+function setupGpu() {
+  const note = $('gpu-setup-note'); note.style.color = 'var(--amber)';
+  note.innerHTML = 'The GPU engine + model slice installs via the one-line join on the GPU box: <code style="color:var(--green)">curl https://circuitllm.xyz/join | bash</code> — then this panel becomes one-click Connect. (In-dashboard engine provisioning is on the way.)';
+}
+
 function fmtUptime(s) { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m ${s % 60}s`; }
 
 async function _inferCheckStatus() {
@@ -2124,7 +2274,8 @@ async function init() {
     await loadLlmStatus();
     refreshOvStake();
     if ($('panel-agent')?.classList.contains('active'))   await loadAgentData();
-    if ($('panel-cloud')?.classList.contains('active'))   await loadCloudData();
+    if ($('panel-cloud')?.classList.contains('active'))   { await loadCloudData(); await loadSetup(); }
+    if ($('panel-dllm')?.classList.contains('active'))    await loadSetup();
     if ($('panel-staking')?.classList.contains('active') && _stakeWallet) await checkStake(_stakeWallet);
   }, 15_000);
 }

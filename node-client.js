@@ -179,6 +179,14 @@ async function runNode() {
     console.log(`[node-client] ✓ LLM worker starting on port ${config.llmWorker.port ?? 19110}`);
   }
 
+  // 7b. Start CPU agent-cloud host if the operator connected it (persisted from the dashboard).
+  if (config.agentCloud?.enabled) {
+    const cpuHost = require('./lib/cpu-host');
+    const r = cpuHost.start(config, config.agentCloud);
+    if (r.ok) console.log(`[node-client] ✓ CPU host starting (budget: ${config.agentCloud.maxAgents ?? '?'} agents)`);
+    else      console.log(`[node-client] ! CPU host not started: ${r.error} (run setup from the dashboard cloud tab)`);
+  }
+
   console.log('');
   const port = config.node.apiPort;
   console.log(`[node-client] ✓ Node running`);
@@ -202,6 +210,7 @@ async function runNode() {
     server.stop();
     updater.stop();
     llmWorker.stop();
+    try { require('./lib/cpu-host').stop(); } catch { /* not started */ }
     await registry.deregister(config);
     console.log('[node-client] Goodbye.');
     process.exit(0);
