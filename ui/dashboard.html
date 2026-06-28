@@ -842,8 +842,9 @@ tr:last-child td{border-bottom:none}
         <code style="color:var(--green)">circuit-agent/data</code> directory, then restart the node.
         <br><br>
         Example: <code style="color:var(--green)">"agentDataPath": "../circuit-agent/data"</code><br><br>
-        Pair an agent to enable the chat interface and agent dashboard tab. The agent uses your node's
-        Data API calls (x402) apply normally.
+        Pairing a trading agent enables the <strong style="color:var(--text)">AGENT</strong> tab (positions, strategy)
+        and the <strong style="color:var(--text)">CHAT</strong> tab (talk to your agent). This is separate from the
+        decentralized 72B inference in the <strong style="color:var(--text)">INFERENCE</strong> tab. Agent Data API calls (x402) apply normally.
       </p>
     </div>
 
@@ -1580,8 +1581,10 @@ function chatConnect() {
 
   chatWs.onopen = () => {
     chatConnected = true;
-    _chatStatus(true, 'Connected');
-    $('chat-send').disabled = false;
+    // The socket reaching the NODE doesn't mean an AGENT is attached — wait for the server to
+    // confirm one (the 'context' message) before showing Connected / enabling send.
+    _chatStatus(false, 'Checking for agent…');
+    $('chat-send').disabled = true;
   };
 
   chatWs.onclose = () => {
@@ -1607,12 +1610,17 @@ function chatConnect() {
     try { msg = JSON.parse(evt.data); } catch { return; }
 
     if (msg.type === 'no-agent') {
-      // Agent not connected — show the disabled panel with reason
+      // Agent not connected — reflect it in the status AND show the disabled panel with the reason.
+      _chatStatus(false, 'No agent connected');
+      $('chat-send').disabled = true;
       const reason = $('chat-no-agent-reason');
       if (reason && msg.reason) reason.textContent = msg.reason;
       $('chat-disabled').style.display = 'block';
       $('chat-ui').style.display       = 'none';
     } else if (msg.type === 'context') {
+      // Agent confirmed present — NOW it's genuinely connected.
+      _chatStatus(true, 'Connected');
+      $('chat-send').disabled = false;
       txt('chat-model-label', msg.model ?? '—');
       _chatAppend(`Node ${msg.nodeId} · v${msg.version} · ${msg.status}`, 'system');
       const agentLabel = msg.agentId ? msg.agentId.slice(0, 16) + '…' : 'agent';
@@ -2142,14 +2150,16 @@ async function _inferCheckStatus() {
     const r = await fetch('/inference/status');
     const d = await r.json();
     if (r.ok && d.available) {
+      const endpoint = String(d.endpoint || '').replace(/^https?:\/\//, '') || 'localhost:19200';
+      const free = /localhost|127\.0\.0\.1/.test(d.endpoint || '') ? 'free · local' : 'free · this node';
       if (dot) dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:var(--yellow);flex-shrink:0;box-shadow:0 0 6px var(--yellow);transition:background .3s';
-      txt('infer-status-text', `Ready · ${d.endpoint || 'localhost:19200'}`);
+      txt('infer-status-text', `Ready (${free}) · ${endpoint}`);
       if (d.model) txt('infer-model-label', `${d.model.toUpperCase()} · CIRCUIT NETWORK`);
       $('infer-send').disabled = false;
     } else {
       if (dot) dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:var(--amber);flex-shrink:0;transition:background .3s';
-      txt('infer-status-text', 'Coordinator not on localhost — inference requires CIRC payment');
-      _inferAppend('The inference coordinator is not running on this machine. To use free inference, run the circuit-decentralized-llm coordinator on the same host as this node client.', 'system');
+      txt('infer-status-text', 'Inference unavailable — node not recognised as live yet');
+      _inferAppend('Free inference is served to LIVE nodes. Make sure this node-client is registered on the network (it announces on start); inference becomes available once it is online.', 'system');
     }
   } catch {
     if (dot) dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:var(--red);flex-shrink:0;transition:background .3s';
