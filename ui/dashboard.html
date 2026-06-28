@@ -2139,7 +2139,10 @@ async function setupCpu() {
 }
 function setupGpu() {
   const note = $('gpu-setup-note'); note.style.color = 'var(--amber)';
-  note.innerHTML = 'The GPU engine + model slice installs via the one-line join on the GPU box: <code style="color:var(--green)">curl https://circuitllm.xyz/join | bash</code> — then this panel becomes one-click Connect. (In-dashboard engine provisioning is on the way.)';
+  note.innerHTML = 'The GPU engine + model slice installs via a one-line join on the GPU box, then this panel becomes one-click Connect.<br>' +
+    '<span style="color:var(--muted)">Linux / WSL:</span> <code style="color:var(--green)">curl -fsSL https://circuitllm.xyz/join | bash</code><br>' +
+    '<span style="color:var(--muted)">Windows (Admin PowerShell):</span> <code style="color:var(--green)">irm https://circuitllm.xyz/join.ps1 | iex</code><br>' +
+    '<span style="color:var(--muted)">(On Windows use the PowerShell line — pasting the curl line into PowerShell won\'t work.)</span>';
 }
 
 function fmtUptime(s) { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m ${s % 60}s`; }

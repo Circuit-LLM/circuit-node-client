@@ -81,11 +81,23 @@ GPU inference runs the real engine ([Circuit-LLM/circuit-dllm](https://github.co
 not this Node.js client. Your GPU holds a contiguous slice of **Qwen2.5-72B-Instruct-AWQ**, the
 coordinator pipelines activations through it, and you earn CIRC ∝ the layers × tokens you serve.
 
-**One command** (Linux, or Windows via WSL2 — needs an NVIDIA GPU):
+**One command** (needs an NVIDIA GPU):
 
 ```bash
+# Linux / WSL2 (run inside a bash shell):
 curl -fsSL https://circuitllm.xyz/join | bash
 ```
+
+**On Windows**, run this in an **Administrator PowerShell** instead — it sets up WSL2 + the GPU
+passthrough, then runs the installer above inside it:
+
+```powershell
+irm https://circuitllm.xyz/join.ps1 | iex
+```
+
+> Don't paste the `curl … | bash` line into PowerShell — PowerShell's `curl` is an alias for
+> `Invoke-WebRequest`, so it prints the HTTP response instead of running the script. Use the
+> `irm … | iex` line above (or run the bash line from inside a WSL/Ubuntu shell).
 
 It auto-installs Docker + the NVIDIA Container Toolkit if missing, pulls the GPU image, asks for a
 payout wallet, and runs an auto-restarting container. **You never touch a docker command.** The node
