@@ -690,6 +690,19 @@ tr:last-child td{border-bottom:none}
           <button class="btn" onclick="showTab('inference')" style="font-size:10px">CHAT WITH THE NETWORK →</button>
         </div>
       </div>
+      <!-- ── GPU NODE (the circuit-gpu-node Docker container from the join installer) ── -->
+      <div class="card mb" id="gpu-node-card">
+        <div class="card-t">GPU NODE <span id="gpu-node-state" style="float:right;font-size:10px;letter-spacing:.1em;color:var(--muted)">—</span></div>
+        <div class="kv"><span class="kv-k">Container</span><span class="kv-v" id="gpu-node-container">circuit-gpu-node</span></div>
+        <div class="kv"><span class="kv-k">Status</span><span class="kv-v" id="gpu-node-statusline">—</span></div>
+        <div id="gpu-node-controls" style="margin-top:12px;display:none;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="gpu-node-startbtn" onclick="gpuNode('start')" style="display:none">▶ START</button>
+          <button class="btn" id="gpu-node-stopbtn" onclick="gpuNode('stop')" style="display:none;color:var(--red);border-color:var(--red)">■ STOP</button>
+          <button class="btn" onclick="gpuNodeLogs()">📜 LOGS</button>
+        </div>
+        <div id="gpu-node-note" style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.7"></div>
+        <pre id="gpu-node-logs" style="display:none;margin-top:10px;max-height:240px;overflow:auto;background:#09080a;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:10px;color:var(--muted);white-space:pre-wrap"></pre>
+      </div>
       <div class="card">
         <div class="card-t">YOUR GPU CONTRIBUTION</div>
         <div class="kv"><span class="kv-k">Worker</span><span class="kv-v" id="dllm-w-status">—</span></div>
@@ -1012,7 +1025,7 @@ function showTab(id) {
   if (id === 'cloud')      { loadCloudData(); loadSetup(); }
   if (id === 'chat')       renderChat();
   if (id === 'inference')  renderInference();
-  if (id === 'dllm')       { loadDllmInfo(); loadSetup(); }
+  if (id === 'dllm')       { loadDllmInfo(); loadSetup(); loadGpuNode(); }
   if (id === 'staking')    loadStakeConfig();
   if (id === 'rpc')        _refreshRpcStakeSummary();
 }
@@ -2031,6 +2044,60 @@ async function dllmWorker(action) {
     if (btnNote) { btnNote.textContent = 'cannot reach node: ' + e.message; btnNote.style.color = 'var(--red)'; }
   }
 }
+// ── GPU node (the circuit-gpu-node Docker container) ────────────────────────
+async function loadGpuNode() {
+  let s;
+  try { s = await (await fetch('/gpu/status')).json(); } catch { return; }
+  const state = $('gpu-node-state'), ctrls = $('gpu-node-controls'),
+        startB = $('gpu-node-startbtn'), stopB = $('gpu-node-stopbtn'), note = $('gpu-node-note');
+  const set = (el, t) => { if (el) el.textContent = t; };
+  set($('gpu-node-container'), s.container || 'circuit-gpu-node');
+  const hide = () => { if (ctrls) ctrls.style.display = 'none'; };
+
+  if (!s.dockerReachable) {
+    if (state) { state.textContent = 'DOCKER UNREACHABLE'; state.style.color = 'var(--amber)'; }
+    set($('gpu-node-statusline'), 'manage from a terminal'); hide();
+    const c = s.cmds || {};
+    if (note) note.innerHTML = "Can't reach Docker from the dashboard. Run these in <strong>PowerShell</strong> (or drop <code>wsl</code> inside WSL):<br>" +
+      ['logs', 'start', 'stop', 'status'].map((k) => `<code style="color:var(--green)">${c[k] || ''}</code>`).join('<br>');
+    return;
+  }
+  if (!s.present) {
+    if (state) { state.textContent = 'NOT SET UP'; state.style.color = 'var(--muted)'; }
+    set($('gpu-node-statusline'), 'no GPU node container yet'); hide();
+    if (note) note.innerHTML = 'Set up a GPU node with the one-liner — <strong>Admin PowerShell</strong> on Windows:<br><code style="color:var(--green)">irm https://circuitllm.xyz/join.ps1 | iex</code><br>Linux / WSL: <code style="color:var(--green)">curl -fsSL https://circuitllm.xyz/join | bash</code>';
+    return;
+  }
+  const running = !!s.running;
+  if (state) { state.textContent = running ? 'RUNNING' : (s.state || 'stopped').toUpperCase(); state.style.color = running ? 'var(--green)' : 'var(--amber)'; }
+  set($('gpu-node-statusline'), s.statusLine || s.state || '—');
+  if (ctrls) ctrls.style.display = 'flex';
+  if (startB) startB.style.display = running ? 'none' : '';
+  if (stopB) stopB.style.display = running ? '' : 'none';
+  if (note) note.textContent = '';
+}
+async function gpuNode(action) {
+  if (action === 'stop' && !confirm('Stop the GPU node container?\n\nIt stops serving the mesh + earning until you start it again.\n\nContinue?')) return;
+  const note = $('gpu-node-note');
+  if (note) { note.style.color = 'var(--muted)'; note.textContent = action + '…'; }
+  try {
+    const r = await fetch('/gpu/' + action, { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { if (note) { note.style.color = 'var(--red)'; note.innerHTML = (d.error || 'failed') + (d.cmd ? `<br>try: <code style="color:var(--green)">${d.cmd}</code>` : ''); } return; }
+    setTimeout(loadGpuNode, 1200);
+  } catch (e) { if (note) { note.style.color = 'var(--red)'; note.textContent = 'cannot reach node: ' + e.message; } }
+}
+async function gpuNodeLogs() {
+  const pre = $('gpu-node-logs');
+  if (!pre) return;
+  pre.style.display = 'block'; pre.textContent = 'loading…';
+  try {
+    const d = await (await fetch('/gpu/logs?tail=120')).json();
+    pre.textContent = d.ok ? (d.text || '(no output yet)') : ('logs unavailable — run: ' + (d.cmd || 'docker logs -f circuit-gpu-node'));
+    pre.scrollTop = pre.scrollHeight;
+  } catch (e) { pre.textContent = 'failed: ' + e.message; }
+}
+
 // ── Connect GPU / CPU (one-click compute contribution) ──────────────────────
 let _setup = null;
 const _sel = { gpu: 'balanced', cpu: 'balanced' };
