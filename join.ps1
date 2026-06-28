@@ -8,7 +8,7 @@
 #
 # Optional, set before running to skip prompts / use the relay:
 #   $env:CIRCUIT_PAYOUT_WALLET = "<your-solana-address>"
-#   $env:CIRCUIT_RELAY_URL     = "relay.circuitllm.xyz:18940"   # if behind a home router (NAT)
+#   $env:CIRCUIT_RELAY_URL     = "relay.circuitllm.xyz:18942"   # if behind a home router (NAT)
 
 $ErrorActionPreference = "Stop"
 
@@ -45,6 +45,9 @@ Info "Make sure the NVIDIA *Windows* driver is installed (Game-Ready/Studio). Do
 Info "driver inside WSL. Verify with:  wsl nvidia-smi"
 
 # 3. run the Linux installer inside WSL, passing through wallet/relay if set
+# A Windows desktop is ~always behind a home router (NAT), so default to the relay — the coordinator
+# reaches this GPU through it without any port-forwarding. Override with $env:CIRCUIT_RELAY_URL.
+if (-not $env:CIRCUIT_RELAY_URL) { $env:CIRCUIT_RELAY_URL = "relay.circuitllm.xyz:18942" }
 $prefix = ""
 if ($env:CIRCUIT_PAYOUT_WALLET) { $prefix += "CIRCUIT_PAYOUT_WALLET='$($env:CIRCUIT_PAYOUT_WALLET)' " }
 if ($env:CIRCUIT_RELAY_URL)     { $prefix += "CIRCUIT_RELAY_URL='$($env:CIRCUIT_RELAY_URL)' " }

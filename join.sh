@@ -70,6 +70,16 @@ else
   ok "Docker can already see the GPU"
 fi
 
+# WSL2's virtual NIC mis-sizes packets, corrupting large TLS responses from registries — the classic
+# "tls: error decoding message" on `docker pull`. Cap the docker MTU so pulls succeed. Merge (don't
+# clobber) so the NVIDIA runtime config above survives. Harmless on a normal NIC.
+if grep -qiE "microsoft|wsl" /proc/version 2>/dev/null; then
+  say "WSL2 — capping docker MTU (1400) so the image pull doesn't fail on TLS…"
+  run python3 -c "import json,os; p='/etc/docker/daemon.json'; d=json.load(open(p)) if os.path.exists(p) else {}; d['mtu']=1400; json.dump(d, open(p,'w'))" 2>/dev/null \
+    && { run systemctl restart docker 2>/dev/null || true; run docker info >/dev/null 2>&1 || true; } \
+    || warn "couldn't set docker MTU automatically — if the pull fails with a TLS error, set {\"mtu\":1400} in /etc/docker/daemon.json"
+fi
+
 # ── 4. config (wallet + control URL) ──────────────────────────────────────────────────────
 CONTROL_URL="${CIRCUIT_CONTROL_URL:-$CONTROL_URL_DEFAULT}"
 WALLET="${CIRCUIT_PAYOUT_WALLET:-}"
@@ -85,7 +95,7 @@ if [ -z "$ADV_HOST" ] && [ -z "${CIRCUIT_RELAY_URL:-}" ]; then
   PUBIP=$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)
   [ -n "$PUBIP" ] && ADV_HOST="$PUBIP"
   warn "advertising public IP ${ADV_HOST:-<unknown>}. If this box is behind a home router (NAT),"
-  warn "the coordinator can't reach it directly yet — relay support is coming (Phase 3)."
+  warn "behind NAT? re-run with  CIRCUIT_RELAY_URL=relay.circuitllm.xyz:18942  to route through the relay."
 fi
 
 # ── 5. pull + run ─────────────────────────────────────────────────────────────────────────
