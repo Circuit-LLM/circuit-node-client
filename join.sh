@@ -70,18 +70,14 @@ else
   ok "Docker can already see the GPU"
 fi
 
-# WSL2's virtual NIC mis-sizes packets, corrupting large TLS handshakes — the classic "tls: error
-# decoding message" on `docker pull`. The daemon pulls over the HOST interface (eth0), so cap ITS MTU
-# (the daemon.json 'mtu' only sizes the container bridge, which is why capping that alone didn't help).
+# WSL2's virtual NIC mis-sizes packets, corrupting large TLS records — the classic "tls: error
+# decoding message" on `docker pull ghcr.io`. The daemon pulls over the HOST interface (eth0), so we
+# cap ITS MTU. Some links need it lower than others (1400 isn't always enough), so the pull below
+# retries DOWN an MTU ladder until it works, then persists whatever worked.
+IS_WSL=""; IFACE="eth0"
 if grep -qiE "microsoft|wsl" /proc/version 2>/dev/null; then
+  IS_WSL=1
   IFACE=$(ip route show default 2>/dev/null | awk '/default/{print $5; exit}'); IFACE="${IFACE:-eth0}"
-  say "WSL2 — capping the $IFACE MTU (1400) so the image pull doesn't fail on TLS…"
-  run ip link set dev "$IFACE" mtu 1400 2>/dev/null || warn "couldn't set $IFACE MTU — if the pull TLS-errors, run: sudo ip link set dev $IFACE mtu 1400"
-  # persist across WSL restarts (WSL honours an /etc/wsl.conf [boot] command)
-  grep -q "set dev $IFACE mtu 1400" /etc/wsl.conf 2>/dev/null || printf '\n[boot]\ncommand = ip link set dev %s mtu 1400\n' "$IFACE" | run tee -a /etc/wsl.conf >/dev/null 2>&1 || true
-  # also size the container bridge (so the gpu-node's own egress isn't oversized)
-  run python3 -c "import json,os; p='/etc/docker/daemon.json'; d=json.load(open(p)) if os.path.exists(p) else {}; d['mtu']=1400; json.dump(d, open(p,'w'))" 2>/dev/null \
-    && { run systemctl restart docker 2>/dev/null || true; run docker info >/dev/null 2>&1 || true; } || true
 fi
 
 # ── 4. config (wallet + control URL) ──────────────────────────────────────────────────────
@@ -103,8 +99,29 @@ if [ -z "$ADV_HOST" ] && [ -z "${CIRCUIT_RELAY_URL:-}" ]; then
 fi
 
 # ── 5. pull + run ─────────────────────────────────────────────────────────────────────────
-say "pulling $IMAGE …"
-run docker pull "$IMAGE" >/dev/null
+# On WSL the ghcr.io pull TLS-errors when the MTU is too high. Try the pull, and on failure lower the
+# eth0 MTU and retry — 1400 fails on some links, 1280 is the usual floor, 1200 for stubborn VPNs.
+pull_image() {
+  if [ -z "$IS_WSL" ]; then say "pulling $IMAGE …"; run docker pull "$IMAGE" >/dev/null; return; fi
+  local mtu ok=""
+  for mtu in ${CIRCUIT_MTU:-} 1400 1280 1200; do
+    [ -n "$mtu" ] || continue
+    run ip link set dev "$IFACE" mtu "$mtu" 2>/dev/null || true
+    say "pulling $IMAGE  ($IFACE MTU $mtu) …"
+    if run docker pull "$IMAGE" >/dev/null 2>&1; then ok="$mtu"; break; fi
+    warn "pull failed at MTU $mtu — lowering and retrying…"
+  done
+  [ -n "$ok" ] || die "the image pull keeps TLS-failing even at MTU 1200.
+     This is usually a VPN/proxy, or Docker Desktop (whose daemon ignores this distro's MTU):
+       • Docker Desktop:  Settings → Docker Engine → add  \"mtu\": 1280  → Apply & Restart, then re-run.
+       • On a VPN/corporate net:  disconnect it (or set  CIRCUIT_MTU=1200) and re-run.
+     Re-run with:  curl -fsSL https://circuitllm.xyz/join | bash"
+  ok "image pulled (MTU $mtu)"
+  # persist the working MTU + size the container bridge to match
+  grep -q "set dev $IFACE mtu" /etc/wsl.conf 2>/dev/null || printf '\n[boot]\ncommand = ip link set dev %s mtu %s\n' "$IFACE" "$ok" | run tee -a /etc/wsl.conf >/dev/null 2>&1 || true
+  run python3 -c "import json,os; p='/etc/docker/daemon.json'; d=json.load(open(p)) if os.path.exists(p) else {}; d['mtu']=$ok; json.dump(d, open(p,'w'))" 2>/dev/null || true
+}
+pull_image
 run docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
 
 say "starting node…"

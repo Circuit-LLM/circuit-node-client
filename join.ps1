@@ -59,4 +59,10 @@ if ($prefix.Trim()) { $cmd = "export $prefix; $cmd" }
 wsl -e bash -lc $cmd
 
 Write-Host ""
+if ($LASTEXITCODE -ne 0) {
+  Warn "The Linux installer exited with an error (code $LASTEXITCODE) — scroll up for the cause."
+  Warn "If it was a 'tls: error decoding message' on the image pull, it's a network MTU/VPN issue;"
+  Warn "the installer already retried down to MTU 1200. Try off-VPN, or re-run:  irm https://circuitllm.xyz/join.ps1 | iex"
+  return
+}
 Ok "Done. Manage the node from inside WSL:  wsl docker logs -f circuit-gpu-node"
