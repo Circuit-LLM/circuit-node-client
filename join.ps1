@@ -52,7 +52,11 @@ $prefix = ""
 if ($env:CIRCUIT_PAYOUT_WALLET) { $prefix += "CIRCUIT_PAYOUT_WALLET='$($env:CIRCUIT_PAYOUT_WALLET)' " }
 if ($env:CIRCUIT_RELAY_URL)     { $prefix += "CIRCUIT_RELAY_URL='$($env:CIRCUIT_RELAY_URL)' " }
 Info "Running the node installer inside WSL..."
-wsl -e bash -lc "$prefix curl -fsSL https://circuitllm.xyz/join | bash"
+# EXPORT the vars so the piped `| bash` (the installer) inherits them. `VAR=val curl … | bash` would
+# only set them for curl, not for the bash running the script — which is why the relay wasn't picked up.
+$cmd = "curl -fsSL https://circuitllm.xyz/join | bash"
+if ($prefix.Trim()) { $cmd = "export $prefix; $cmd" }
+wsl -e bash -lc $cmd
 
 Write-Host ""
 Ok "Done. Manage the node from inside WSL:  wsl docker logs -f circuit-gpu-node"

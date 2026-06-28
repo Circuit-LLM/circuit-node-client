@@ -70,14 +70,18 @@ else
   ok "Docker can already see the GPU"
 fi
 
-# WSL2's virtual NIC mis-sizes packets, corrupting large TLS responses from registries — the classic
-# "tls: error decoding message" on `docker pull`. Cap the docker MTU so pulls succeed. Merge (don't
-# clobber) so the NVIDIA runtime config above survives. Harmless on a normal NIC.
+# WSL2's virtual NIC mis-sizes packets, corrupting large TLS handshakes — the classic "tls: error
+# decoding message" on `docker pull`. The daemon pulls over the HOST interface (eth0), so cap ITS MTU
+# (the daemon.json 'mtu' only sizes the container bridge, which is why capping that alone didn't help).
 if grep -qiE "microsoft|wsl" /proc/version 2>/dev/null; then
-  say "WSL2 — capping docker MTU (1400) so the image pull doesn't fail on TLS…"
+  IFACE=$(ip route show default 2>/dev/null | awk '/default/{print $5; exit}'); IFACE="${IFACE:-eth0}"
+  say "WSL2 — capping the $IFACE MTU (1400) so the image pull doesn't fail on TLS…"
+  run ip link set dev "$IFACE" mtu 1400 2>/dev/null || warn "couldn't set $IFACE MTU — if the pull TLS-errors, run: sudo ip link set dev $IFACE mtu 1400"
+  # persist across WSL restarts (WSL honours an /etc/wsl.conf [boot] command)
+  grep -q "set dev $IFACE mtu 1400" /etc/wsl.conf 2>/dev/null || printf '\n[boot]\ncommand = ip link set dev %s mtu 1400\n' "$IFACE" | run tee -a /etc/wsl.conf >/dev/null 2>&1 || true
+  # also size the container bridge (so the gpu-node's own egress isn't oversized)
   run python3 -c "import json,os; p='/etc/docker/daemon.json'; d=json.load(open(p)) if os.path.exists(p) else {}; d['mtu']=1400; json.dump(d, open(p,'w'))" 2>/dev/null \
-    && { run systemctl restart docker 2>/dev/null || true; run docker info >/dev/null 2>&1 || true; } \
-    || warn "couldn't set docker MTU automatically — if the pull fails with a TLS error, set {\"mtu\":1400} in /etc/docker/daemon.json"
+    && { run systemctl restart docker 2>/dev/null || true; run docker info >/dev/null 2>&1 || true; } || true
 fi
 
 # ── 4. config (wallet + control URL) ──────────────────────────────────────────────────────
