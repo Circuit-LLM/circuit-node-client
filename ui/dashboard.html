@@ -1511,6 +1511,7 @@ function renderCloud() {
   $('cloud-disabled-msg').style.display = show ? 'none' : 'block';
   $('cloud-content').style.display      = show ? 'block' : 'none';
   _show('cl-disconnect-wrap', show);
+  if (show) { const n = $('cl-disconnect-note'); if (n) n.textContent = ''; } // drop any stale "disconnected" text
   if (!show) return;
 
   txt('cl-status', h.running ? 'ACTIVE' : 'IDLE', h.running ? 'green' : 'amber');
@@ -2044,7 +2045,14 @@ function renderConnectGpu(g) {
   if (g.payoutWallet && $('gpu-wallet') && !$('gpu-wallet').value) $('gpu-wallet').value = g.payoutWallet;
 }
 function renderConnectCpu(c) {
-  _show('cpu-setup', !c.hostPresent); _show('cpu-form', c.hostPresent);
+  // If this box is already hosting, hide BOTH the setup and connect forms — the live status and the
+  // Disconnect button live in cloud-content (renderCloud). Keying off connected/running here (not just
+  // hostPresent) stops the CONNECT button from showing while hosting, which previously raced with
+  // renderCloud and produced a contradictory "connect + active hosting" panel.
+  const hosting = !!(c.connected || c.host?.running);
+  _show('cpu-setup', !c.hostPresent && !hosting);
+  _show('cpu-form',  c.hostPresent && !hosting);
+  if (hosting) return;
   const p = c.presets || {}, m = p.machine || {};
   txt('cpu-machine', `${m.cores ?? '?'} cores · ${Math.round((m.ramMb || 0) / 1024)}GB`);
   const desc = b => b ? `${b.maxAgents} agents · ${b.maxCpu} cores` : '—';
@@ -2094,6 +2102,7 @@ async function connectCpu() {
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { note.style.color = 'var(--red)'; note.textContent = d.error === 'node-host-missing' ? 'agent-host not installed — run setup above' : (d.error || 'connect failed'); if (d.error === 'node-host-missing') loadSetup(); return; }
     note.style.color = 'var(--green)'; note.textContent = `connected — hosting up to ${d.budget?.maxAgents} agents. Registering…`;
+    { const dn = $('cl-disconnect-note'); if (dn) dn.textContent = ''; } // clear any stale disconnect text
     // The panel flips to the live view once the node-host writes its first heartbeat snapshot
     // (~8s); refresh at 1.5s (instant feedback) and 9s (catches the registration).
     setTimeout(() => { loadCloudData(); loadSetup(); }, 1500);
@@ -2107,6 +2116,7 @@ async function disconnectCpu() {
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { if (note) { note.style.color = 'var(--red)'; note.textContent = d.error || 'disconnect failed'; } return; }
     if (note) { note.style.color = 'var(--green)'; note.textContent = 'disconnected — no longer hosting.'; }
+    { const cn = $('cpu-connect-note'); if (cn) cn.textContent = ''; } // clear any stale connect text
     setTimeout(() => { loadCloudData(); loadSetup(); }, 800);
   } catch (e) { if (note) { note.style.color = 'var(--red)'; note.textContent = 'cannot reach node: ' + e.message; } }
 }
