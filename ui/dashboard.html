@@ -923,6 +923,10 @@ tr:last-child td{border-bottom:none}
         <div class="kv"><span class="kv-k">Budget</span><span class="kv-v" id="cl-budget">—</span></div>
         <div class="kv"><span class="kv-k">Custody</span><span class="kv-v teal">off-box signer</span></div>
         <div class="kv"><span class="kv-k">Updated</span><span class="kv-v" id="cl-updated">—</span></div>
+        <div id="cl-disconnect-wrap" style="margin-top:12px;display:none">
+          <button class="btn" onclick="disconnectCpu()" style="width:100%">⏻ DISCONNECT — STOP HOSTING</button>
+          <div id="cl-disconnect-note" class="muted-note" style="margin-top:6px"></div>
+        </div>
       </div>
 
       <div class="card mb">
@@ -1501,10 +1505,12 @@ async function loadCloudData() {
 function renderCloud() {
   const d = _cloudData || {};
   const h = d.hosting || {};
-  // "Active" = this node is hosting, OR the cloud is reachable and we can show the wider view.
-  const show = !!(h.running || d.cloud?.reachable);
+  // Hosting-driven toggle: this node is hosting → show status + Disconnect; else → the Connect form.
+  // (The cloud-wide node list is admin-gated, so an outside operator can't drive the panel off it.)
+  const show = !!h.running;
   $('cloud-disabled-msg').style.display = show ? 'none' : 'block';
   $('cloud-content').style.display      = show ? 'block' : 'none';
+  _show('cl-disconnect-wrap', show);
   if (!show) return;
 
   txt('cl-status', h.running ? 'ACTIVE' : 'IDLE', h.running ? 'green' : 'amber');
@@ -2087,9 +2093,22 @@ async function connectCpu() {
     const r = await fetch('/cloud/host/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { note.style.color = 'var(--red)'; note.textContent = d.error === 'node-host-missing' ? 'agent-host not installed — run setup above' : (d.error || 'connect failed'); if (d.error === 'node-host-missing') loadSetup(); return; }
-    note.style.color = 'var(--green)'; note.textContent = `connected — hosting up to ${d.budget?.maxAgents} agents.`;
+    note.style.color = 'var(--green)'; note.textContent = `connected — hosting up to ${d.budget?.maxAgents} agents. Registering…`;
+    // The panel flips to the live view once the node-host writes its first heartbeat snapshot
+    // (~8s); refresh at 1.5s (instant feedback) and 9s (catches the registration).
     setTimeout(() => { loadCloudData(); loadSetup(); }, 1500);
+    setTimeout(() => { loadCloudData(); loadSetup(); }, 9000);
   } catch (e) { note.style.color = 'var(--red)'; note.textContent = 'cannot reach node: ' + e.message; }
+}
+async function disconnectCpu() {
+  const note = $('cl-disconnect-note'); if (note) { note.style.color = 'var(--muted)'; note.textContent = 'disconnecting…'; }
+  try {
+    const r = await fetch('/cloud/host/stop', { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { if (note) { note.style.color = 'var(--red)'; note.textContent = d.error || 'disconnect failed'; } return; }
+    if (note) { note.style.color = 'var(--green)'; note.textContent = 'disconnected — no longer hosting.'; }
+    setTimeout(() => { loadCloudData(); loadSetup(); }, 800);
+  } catch (e) { if (note) { note.style.color = 'var(--red)'; note.textContent = 'cannot reach node: ' + e.message; } }
 }
 async function setupCpu() {
   const note = $('cpu-setup-note'); note.style.color = 'var(--muted)'; note.textContent = 'installing…';
