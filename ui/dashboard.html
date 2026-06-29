@@ -355,6 +355,24 @@ tr:last-child td{border-bottom:none}
       </div>
     </div>
 
+    <div class="card mb">
+      <div class="card-t">Admin Access <span class="card-t-r" id="admin-access-state">—</span></div>
+      <p style="font-size:11px;color:var(--muted);line-height:1.8;margin-bottom:12px">
+        Management actions (apply update, start/stop worker &amp; CPU host, GPU controls) and a few
+        sensitive status reads are protected. <span style="color:var(--green)">Localhost and SSH-tunnel
+        access are trusted automatically</span> — you only need the token to manage this node from a
+        <em>non-localhost</em> browser. Find it in the node startup log or run
+        <code style="color:var(--green)">node node-client.js status</code>.
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="admin-token-input" type="password" placeholder="paste admin token"
+          style="flex:1;min-width:200px;background:var(--s3,#0e0c06);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-size:11px;border-radius:4px" />
+        <button class="btn primary" onclick="setAdminToken()" style="font-size:10px">UNLOCK</button>
+        <button class="btn" onclick="clearAdminToken()" style="font-size:10px">CLEAR</button>
+      </div>
+      <div id="admin-access-note" style="margin-top:8px;font-size:10px;color:var(--muted)"></div>
+    </div>
+
     <div class="g2 mb">
       <div class="card">
         <div class="card-t">Local API Usage</div>
@@ -1040,7 +1058,7 @@ function showTab(id) {
   if (id === 'inference')  renderInference();
   if (id === 'dllm')       { loadDllmInfo(); loadSetup(); loadGpuNode(); }
   if (id === 'staking')    loadStakeConfig();
-  if (id === 'rpc')        _refreshRpcStakeSummary();
+  if (id === 'rpc')        { _refreshRpcStakeSummary(); renderAdminAccess(); }
 }
 
 function addLog(msg, type = '') {
@@ -1836,6 +1854,39 @@ function _refreshRpcStakeSummary() {
       stEl.className = 'kv-v ' + (_stakeResult.eligible ? 'green' : 'red');
     }
   }
+}
+
+// ── Admin access (token cookie) ─────────────────────────────────────────────────
+// Same-origin fetches send cookies automatically, so setting this one unlocks every
+// admin call + sensitive read without touching individual fetch sites. Localhost / SSH
+// tunnels are trusted server-side and never need this.
+function _setCookie(name, val, days) {
+  document.cookie = `${name}=${encodeURIComponent(val)}; path=/; max-age=${(days||365)*86400}; SameSite=Strict`;
+}
+function _getCookie(name) {
+  const hit = document.cookie.split(';').map(s => s.trim()).find(s => s.startsWith(name + '='));
+  return hit ? decodeURIComponent(hit.slice(name.length + 1)) : '';
+}
+function setAdminToken() {
+  const el = $('admin-token-input');
+  const v = (el?.value || '').trim();
+  if (!v) { txt('admin-access-note', 'Paste the token first.'); return; }
+  _setCookie('circuit_admin', v, 365);
+  if (el) el.value = '';
+  renderAdminAccess();
+  txt('admin-access-note', 'Admin token set for this browser — management actions are now unlocked.');
+}
+function clearAdminToken() {
+  document.cookie = 'circuit_admin=; path=/; max-age=0; SameSite=Strict';
+  renderAdminAccess();
+  txt('admin-access-note', 'Admin token cleared from this browser.');
+}
+function renderAdminAccess() {
+  const el = $('admin-access-state');
+  if (!el) return;
+  const set = !!_getCookie('circuit_admin');
+  el.textContent = set ? 'token set' : 'localhost-trusted';
+  el.style.color = set ? 'var(--green)' : 'var(--muted)';
 }
 
 let _walletProvider = null;

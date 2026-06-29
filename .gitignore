@@ -8,6 +8,7 @@ config/client.json
 # Runtime data — never commit
 data/identity.json
 data/signing-key.json
+data/admin-token
 data/update-history.json
 data/cache/
 data/staging/

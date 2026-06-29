@@ -225,6 +225,8 @@ async function runNode() {
   console.log(`[node-client] ✓ Dashboard: http://localhost:${port}/`);
   console.log(`[node-client] ✓ Local API: http://localhost:${port}/api/...`);
   console.log(`[node-client] ✓ Health:    http://localhost:${port}/health`);
+  console.log(`[node-client] ✓ Admin token: ${server.adminToken()}`);
+  console.log(`[node-client]   (only needed to MANAGE the node from a non-localhost browser — localhost & SSH tunnels are trusted)`);
   if (config.node?.agentDataPath) {
     console.log(`[node-client] ✓ Chat:      ws://localhost:${port}/chat  (agent connected)`);
   } else {
@@ -395,6 +397,7 @@ async function runStatus() {
   console.log(`Region:   ${config.node.region}`);
   console.log(`API Port: ${config.node.apiPort}`);
   console.log(`Shards:   ${config.node.shards?.join(', ') ?? 'all'}`);
+  console.log(`Admin token: ${server.adminToken()}  (for non-localhost dashboard management)`);
 
   // Check if node is registered
   try {
