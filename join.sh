@@ -83,9 +83,42 @@ fi
 # ── 4. config (wallet + control URL) ──────────────────────────────────────────────────────
 CONTROL_URL="${CIRCUIT_CONTROL_URL:-$CONTROL_URL_DEFAULT}"
 WALLET="${CIRCUIT_PAYOUT_WALLET:-}"
-if [ -z "$WALLET" ] && [ -t 0 ]; then
+WALLET_FROM_ENV=""; [ -n "$WALLET" ] && WALLET_FROM_ENV=1
+
+valid_wallet() { printf '%s' "$1" | grep -qE '^[1-9A-HJ-NP-Za-km-z]{32,44}$'; }
+
+# Preserve the wallet from an existing install so a routine re-run/update doesn't silently
+# turn a *paid* node *unpaid* when the operator just hits Enter.
+if [ -z "$WALLET" ]; then
+  WALLET=$(run docker inspect "$CONTAINER" \
+      --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+    | sed -n 's/^CIRCUIT_PAYOUT_WALLET=//p' | head -1) || true
+fi
+
+if [ -t 0 ]; then
   echo
-  read -rp "$(c '1;36' '?') Solana wallet for CIRC earnings (blank to run unpaid for now): " WALLET || true
+  while :; do
+    if [ -n "$WALLET" ]; then
+      read -rp "$(c '1;36' '?') Solana wallet for CIRC earnings [$WALLET] (Enter to keep): " ANS || true
+      [ -z "$ANS" ] && break
+      WALLET="$ANS"
+    else
+      read -rp "$(c '1;36' '?') Solana wallet for CIRC earnings (blank to run unpaid for now): " WALLET || true
+      [ -z "$WALLET" ] && break
+    fi
+    valid_wallet "$WALLET" && break
+    warn "that doesn't look like a Solana address (32–44 base58 chars). Try again, or leave blank to skip."
+    WALLET=""
+  done
+elif [ -n "$WALLET" ] && ! valid_wallet "$WALLET"; then
+  # Non-interactive: a wallet the operator explicitly passed but that's malformed is a hard
+  # error (don't silently earn to a typo). A bad value carried over from a prior install just
+  # falls back to unpaid with a warning.
+  if [ -n "$WALLET_FROM_ENV" ]; then
+    die "CIRCUIT_PAYOUT_WALLET='$WALLET' is not a valid Solana address (32–44 base58 chars)."
+  fi
+  warn "stored wallet '$WALLET' looks invalid — running unpaid. Re-run with CIRCUIT_PAYOUT_WALLET=<addr> to fix."
+  WALLET=""
 fi
 
 # Public-IP boxes (cloud) advertise their address so the coordinator can dial them. Home boxes
@@ -124,6 +157,14 @@ pull_image() {
 pull_image
 run docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
 
+# Make sure 19210 is free before binding it — a foreign holder would otherwise make `docker run`
+# fail late with a cryptic bind error *after* the multi-GB pull. (Our own old container is already
+# removed above, so anything still listening is something else.)
+if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q ':19210 '; then
+  die "port 19210 is already in use by another process.
+     Stop whatever is listening, then re-run. To see what holds it:  sudo ss -ltnp | grep :19210"
+fi
+
 say "starting node…"
 ARGS=(-d --name "$CONTAINER" --gpus all --restart unless-stopped
       -v "$VOLUME:/var/lib/circuit"
@@ -137,13 +178,28 @@ ARGS=(-d --name "$CONTAINER" --gpus all --restart unless-stopped
 [ -n "${CIRCUIT_REGION:-}" ]            && ARGS+=(-e CIRCUIT_REGION="$CIRCUIT_REGION")
 run docker run "${ARGS[@]}" "$IMAGE" >/dev/null
 
+# Confirm it actually came up instead of crash-looping, so the operator gets a real
+# "did it work?" signal rather than a hopeful banner over a dead container.
+sleep 2
+STATE=$(run docker inspect -f '{{.State.Status}}' "$CONTAINER" 2>/dev/null || echo unknown)
+
 echo
-ok "Circuit GPU node is running."
-echo "  joined:   $CONTROL_URL"
-echo "  earnings: ${WALLET:-<none set — re-run with a wallet to earn>}"
+if [ "$STATE" = "running" ]; then
+  ok "Circuit GPU node is running."
+else
+  warn "node started but its state is '$STATE' — it may have failed to launch. Check:  docker logs $CONTAINER"
+fi
+echo "  joined:    $CONTROL_URL"
+if [ -n "$WALLET" ]; then
+  echo "  earnings:  $WALLET"
+else
+  echo "  earnings:  $(c '1;33' '<none set — re-run with a wallet to earn>')"
+fi
 echo
-echo "  $(c '1;36' 'logs:')     docker logs -f $CONTAINER"
+echo "  $(c '1;36' 'verify:')   docker logs -f $CONTAINER"
+echo "             $(c '2' 'watch for "registered" + your assigned layers — that confirms you are in the mesh and earning')"
 echo "  $(c '1;36' 'stop:')     docker stop $CONTAINER"
-echo "  $(c '1;36' 'update:')   docker pull $IMAGE && bash join.sh"
+echo "  $(c '1;36' 'update:')   docker pull $IMAGE && curl -fsSL https://circuitllm.xyz/join | bash"
 echo
 say "first start downloads the model shard for your assigned layers — give it a few minutes."
+say "your node registers at $CONTROL_URL once it's pulled its shard and connected."

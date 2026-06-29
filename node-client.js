@@ -98,6 +98,38 @@ function loadConfig() {
   return config;
 }
 
+// ── Crash safety ────────────────────────────────────────────────────────────
+// Without these, an unhandled rejection / uncaught exception kills the process with
+// no operator-facing context AND leaves the LLM-worker / CPU-host children orphaned
+// (holding the GPU + ports → "address in use" on the next start). Shared with the
+// SIGINT/SIGTERM shutdown() below via the _shuttingDown guard.
+let _shuttingDown = false;
+
+function _stopChildren() {
+  for (const [name, fn] of [
+    ['sync',      () => sync.stop()],
+    ['server',    () => server.stop()],
+    ['updater',   () => updater.stop()],
+    ['llmWorker', () => llmWorker.stop()],
+    ['cpu-host',  () => require('./lib/cpu-host').stop()],
+  ]) {
+    try { fn(); } catch (err) { console.error(`[node-client] error stopping ${name}:`, err.message); }
+  }
+}
+
+process.on('unhandledRejection', (reason) => {
+  // Log and keep running — a stray rejected promise shouldn't take the whole node down.
+  console.error('[node-client] UNHANDLED REJECTION:', reason instanceof Error ? reason.stack : reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[node-client] UNCAUGHT EXCEPTION:', err?.stack || err);
+  if (_shuttingDown) return;
+  _shuttingDown = true;
+  _stopChildren();   // don't orphan the GPU/worker children when we die
+  setTimeout(() => process.exit(1), 500).unref();
+});
+
 // ── Commands ──────────────────────────────────────────────────────────────────
 
 const command = process.argv[2] ?? 'start';
@@ -205,13 +237,20 @@ async function runNode() {
 
   // ── Graceful shutdown ─────────────────────────────────────────────────────
   async function shutdown(signal) {
+    if (_shuttingDown) return;   // ignore a second SIGINT/SIGTERM (or SIGINT-then-SIGTERM under systemd)
+    _shuttingDown = true;
     console.log(`\n[node-client] ${signal} received — shutting down gracefully`);
-    sync.stop();
-    server.stop();
-    updater.stop();
-    llmWorker.stop();
-    try { require('./lib/cpu-host').stop(); } catch { /* not started */ }
-    await registry.deregister(config);
+    // Hard watchdog: always exit even if deregister hangs on a slow/dead registry,
+    // so systemd doesn't have to SIGKILL us mid-write.
+    const watchdog = setTimeout(() => {
+      console.warn('[node-client] shutdown watchdog fired — forcing exit');
+      process.exit(0);
+    }, 6_000);
+    watchdog.unref();
+    _stopChildren();
+    try { await registry.deregister(config); }
+    catch (err) { console.warn('[node-client] deregister failed:', err.message); }
+    clearTimeout(watchdog);
     console.log('[node-client] Goodbye.');
     process.exit(0);
   }
@@ -261,11 +300,35 @@ async function runSetup() {
   console.log('');
 
   // ── Port ──────────────────────────────────────────────────────────────────
+  // Quick "is this port bindable right now?" probe so the operator doesn't pick a port
+  // the node will fail to bind at start (with a much more cryptic EADDRINUSE).
+  const net = require('net');
+  const portFree = (p) => new Promise(resolve => {
+    const srv = net.createServer();
+    srv.once('error', () => resolve(false));
+    srv.once('listening', () => srv.close(() => resolve(true)));
+    srv.listen(p, '0.0.0.0');
+  });
+
   console.log(`  ${B('API Port')}  ${D('(dashboard + local API, default 19000)')}`);
   console.log(`  ${D('current:')}  ${Y(config.node?.apiPort ?? 19000)}`);
-  const portAns = await ask('  Port (Enter to keep): ');
   const curPort = config.node?.apiPort ?? 19000;
-  const apiPort = portAns.trim() ? (parseInt(portAns.trim(), 10) || curPort) : curPort;
+  let apiPort = curPort;
+  while (true) {
+    const portAns = (await ask('  Port (Enter to keep): ')).trim();
+    if (!portAns) { apiPort = curPort; break; }
+    const n = parseInt(portAns, 10);
+    if (!Number.isInteger(n) || n < 1024 || n > 65535) {
+      console.log(`  ${Y('⚠')} Enter a port between 1024 and 65535.`);
+      continue;
+    }
+    if (n !== curPort && !(await portFree(n))) {
+      console.log(`  ${Y('⚠')} Port ${n} is already in use — pick another.`);
+      continue;
+    }
+    apiPort = n;
+    break;
+  }
   console.log(`  ${G('✓')} Port: ${Y(apiPort)}`);
   console.log('');
 

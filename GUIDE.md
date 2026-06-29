@@ -10,7 +10,7 @@ CIRCUIT is a Solana-native network combining two layers:
 
 **Data mesh** — the canonical node at [circuitllm.xyz](https://circuitllm.xyz) aggregates on-chain data (token prices, wallet analytics, DEX pool data, validator stats) and serves it through an API gated by x402 CIRC micropayments. Running a node participates in the distributed mesh that will eventually serve this data without relying on the canonical hub.
 
-**Decentralized LLM inference** — a pipeline of worker nodes, each holding a shard of a transformer model (Qwen2.5-0.5B), cooperating to run inference requests across the network. Node operators earn CIRC for compute contributed. Any node operator can chat with the inference network for free from their dashboard.
+**Decentralized LLM inference** — a pipeline of worker nodes, each holding a shard of a transformer model (Qwen2.5-72B-Instruct, AWQ 4-bit), cooperating to run inference requests across the network. Node operators earn CIRC for compute contributed. Any node operator can chat with the inference network for free from their dashboard.
 
 ---
 
@@ -106,7 +106,7 @@ Open `http://localhost:19000` in your browser.
 
 ```bash
 node node-client.js start              # Start the node (default)
-node node-client.js setup              # Show identity and current config
+node node-client.js setup              # Interactive setup wizard (region, port, agent pairing)
 node node-client.js status             # Check node + network status
 node node-client.js update             # Check for and apply updates
 node node-client.js rollback           # List available rollback versions
@@ -203,7 +203,7 @@ The chat is proxied through your node's local API at `POST /inference/chat`. The
 - **CLEAR** button to reset the session
 - Status bar shows coordinator availability and model name
 
-The model is Qwen2.5-0.5B-Instruct, running distributed across the worker mesh.
+The model is Qwen2.5-72B-Instruct (AWQ 4-bit), running distributed across the worker mesh.
 
 ---
 
@@ -293,17 +293,17 @@ In `config/client.json`:
 ### What Happens at Startup
 
 1. The LLM worker process starts on the configured port
-2. It registers with the coordinator and receives its layer assignment (e.g. layers 4–7 of 24)
-3. The coordinator streams the model weight shard for those layers (~40MB)
+2. It registers with the coordinator and receives its layer assignment (e.g. layers 4–11 of 80)
+3. The coordinator streams the model weight shard for those layers (sized to your slice — GB-scale, one-time per layer set)
 4. Your node is now active in the inference pipeline
 
 Check worker status at `GET /llm/status` on your node API, or see it in the `/health` response.
 
 ### Resource Usage
 
-- **RAM** — ~80MB per node for a 4-layer shard of Qwen2.5-0.5B
-- **CPU** — bursts during inference steps (~1–2 seconds per request)
-- **Network** — initial weight download (~40MB), then lightweight tensor traffic during inference
+- **VRAM** — ≈0.5 GB per model layer held (a Qwen2.5-72B-Instruct AWQ 4-bit slice); the worker sizes your slice to fit your GPU
+- **GPU** — active during inference steps, idle otherwise
+- **Network** — initial weight-shard download for your layers (GB-scale, one-time), then lightweight tensor traffic during inference
 
 ### Firewall Note
 
@@ -318,7 +318,7 @@ The coordinator initiates TCP connections **to your worker**. If you're behind a
 
 ### What Staking Does
 
-In the current Phase 1 build, staking CIRC into the CIRCUIT StakePoint pool verifies your token ownership on-chain. The staking panel in the Keys tab shows your stake status but does not yet gate access — staking is pre-staged for Phase 3, where CIRC stake will determine RPC tier.
+In the current Phase 1 build, staking CIRC into the CIRCUIT StakePoint pool verifies your token ownership on-chain. The staking panel in the Staking tab shows your stake status but does not yet gate external access — staking is pre-staged for Phase 3, where CIRC stake will determine RPC tier.
 
 In Phase 3:
 - Stake CIRC → maintain RPC credentials for yourself and your agents
@@ -327,7 +327,7 @@ In Phase 3:
 
 ### Connecting Your Wallet
 
-In the **Keys tab**, find the **CIRC Staking Access** card. Click **Connect Wallet**.
+In the **Staking tab**, find the **CIRC Staking Access** card. Click **Connect Wallet**.
 
 This opens your Phantom or Solflare wallet extension. Approve the connection — no transaction is signed, this is a read-only check to see your stake balance.
 
@@ -416,7 +416,7 @@ circuit-node-client/
 │   ├── chat.js             WebSocket agent chat bridge
 │   └── updater.js          Signed update download, verify, and apply
 ├── ui/
-│   └── dashboard.html      Single-page dashboard (7 tabs)
+│   └── dashboard.html      Single-page dashboard (10 tabs)
 ├── deploy/
 │   ├── generate-signing-key.js   Operator: one-time signing key setup
 │   ├── publish-update.js         Operator: sign and publish a release

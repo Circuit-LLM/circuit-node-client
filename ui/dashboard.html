@@ -248,15 +248,15 @@ tr:last-child td{border-bottom:none}
 <!-- ── Tabs ── -->
 <nav class="tabs">
   <div class="tab active" onclick="showTab('overview')"><span class="dot"></span>OVERVIEW</div>
-  <div class="tab" onclick="showTab('rpc')"><span class="dot"></span>RPC KEY</div>
   <div class="tab" onclick="showTab('network')"><span class="dot"></span>NETWORK</div>
-  <div class="tab" onclick="showTab('updates')"><span class="dot"></span>UPDATES</div>
   <div class="tab" onclick="showTab('staking')" id="tab-staking"><span class="dot"></span>STAKING</div>
   <div class="tab" onclick="showTab('dllm')" id="tab-dllm"><span class="dot"></span>DLLM</div>
+  <div class="tab" onclick="showTab('cloud')"><span class="dot"></span>CLOUD</div>
   <div class="tab" onclick="showTab('inference')" id="tab-inference"><span class="dot"></span>CHAT</div>
   <div class="tab" onclick="showTab('agent')"><span class="dot"></span>AGENT</div>
   <div class="tab" onclick="showTab('chat')" id="tab-chat"><span class="dot"></span>AGENT CHAT</div>
-  <div class="tab" onclick="showTab('cloud')"><span class="dot"></span>CLOUD</div>
+  <div class="tab" onclick="showTab('rpc')"><span class="dot"></span>RPC KEY</div>
+  <div class="tab" onclick="showTab('updates')"><span class="dot"></span>UPDATES</div>
 </nav>
 
 <!-- ── Main ── -->
@@ -537,7 +537,7 @@ tr:last-child td{border-bottom:none}
       <div class="card-t">What Staking Unlocks</div>
       <div class="g2">
         <div>
-          <div class="kv"><span class="kv-k">External RPC Access</span><span class="kv-v green">Unlocked by stake</span></div>
+          <div class="kv"><span class="kv-k">External RPC Access</span><span class="kv-v amber">Stake-gated · Phase 3</span></div>
           <div class="kv"><span class="kv-k">Local API Access</span><span class="kv-v green">No key required</span></div>
           <div class="kv"><span class="kv-k">Dashboard</span><span class="kv-v green">No auth required</span></div>
           <div class="kv"><span class="kv-k">Decentralized Inference</span><span class="kv-v">Available on localhost</span></div>
@@ -545,9 +545,13 @@ tr:last-child td{border-bottom:none}
         <div>
           <div class="kv"><span class="kv-k">External inference callers</span><span class="kv-v amber">CIRC payment (x402)</span></div>
           <div class="kv"><span class="kv-k">Stake-gated RPC</span><span class="kv-v amber" id="unlock-min-display">—</span></div>
-          <div class="kv"><span class="kv-k">Lock period</span><span class="kv-v">Determined by pool</span></div>
-          <div class="kv"><span class="kv-k">Earn CIRC</span><span class="kv-v green">Via inference compute</span></div>
+          <div class="kv"><span class="kv-k">Lock period</span><span class="kv-v green">None · open (0 days)</span></div>
+          <div class="kv"><span class="kv-k">Earn CIRC</span><span class="kv-v green">Inference + API payments</span></div>
         </div>
+      </div>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:9px;color:var(--muted);line-height:1.65">
+        <div style="margin-bottom:6px"><span style="color:var(--amber)">⚠ Phase 3 (coming soon):</span> External RPC access for remote callers is not live yet — the <code style="color:var(--green)">/rpc</code> pipe is restricted to localhost until signature-based wallet verification (proof-of-possession) ships. Your stake is verified on-chain today; remote serving activates in Phase&nbsp;3.</div>
+        <div><span style="color:var(--green)">Earnings:</span> CIRC earned from network inference and data-API (x402) payments funnels to node operators, distributed proportional to stake. The stake itself stays liquid — there is no lock-up, withdraw any time.</div>
       </div>
     </div>
 
@@ -978,7 +982,13 @@ function txt(id, val, cls) {
   const el = $(id);
   if (!el) return;
   el.textContent = val ?? '—';
-  if (cls) { el.className = el.className.replace(/\b(green|amber|red|teal)\b/g, ''); el.classList.add(cls); }
+  // When the caller specifies colour intent (even '' for neutral), clear any stale
+  // colour class first, then apply the new one. Callers that pass NO colour arg keep
+  // whatever (possibly static) colour the element already has.
+  if (cls !== undefined) {
+    el.className = el.className.replace(/\b(green|amber|red|teal)\b/g, '').replace(/\s+/g, ' ').trim();
+    if (cls) el.classList.add(cls);
+  }
 }
 
 function fmtUptime(secs) {
@@ -998,8 +1008,11 @@ function fmtTs(iso) {
 
 function fmtAgo(iso) {
   if (!iso) return '—';
-  const s = Math.round((Date.now() - new Date(iso)) / 1000);
-  if (s < 60)  return `${s}s ago`;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return '—';   // malformed timestamp → '—', never NaN / throw
+  const s = Math.round((Date.now() - t) / 1000);
+  if (s < 0)    return 'just now';
+  if (s < 60)   return `${s}s ago`;
   if (s < 3600) return `${Math.floor(s/60)}m ago`;
   return `${Math.floor(s/3600)}h ago`;
 }
@@ -1049,22 +1062,53 @@ function renderLog() {
 function copyKey(valId, copiedId) {
   const val = $(valId)?.textContent?.trim();
   if (!val || val === 'generating…' || val === 'loading…') return;
-  navigator.clipboard.writeText(val).then(() => {
+  const flash = (overrideText) => {
     const el = $(copiedId);
     if (!el) return;
+    if (overrideText) el.textContent = overrideText;
     el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 1800);
-  });
+    setTimeout(() => el.classList.remove('show'), overrideText ? 2600 : 1800);
+  };
+  // execCommand fallback — navigator.clipboard is undefined over plain HTTP on a
+  // non-localhost origin (e.g. operator browsing the dashboard at http://<lan-ip>:19000).
+  const fallback = () => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = val;
+      ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      flash(ok ? null : 'copy failed — select manually');
+    } catch { flash('copy failed — select manually'); }
+  };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(val).then(() => flash(null)).catch(fallback);
+  } else {
+    fallback();
+  }
 }
 
 // ── Load node status ──────────────────────────────────────────────────────────
+let _healthWasDown = false;
 async function loadStatus() {
   const data = await api('/health');
   if (!data) {
+    // Node unreachable — reflect it everywhere the page would otherwise look
+    // half-alive with stale values, not just the header dot.
     txt('h-status', 'OFFLINE', 'red');
+    txt('h-sync',   'OFFLINE', 'red');
     $('live-dot')?.classList.add('red');
+    const ring = $('ov-ring'); if (ring) ring.className = 'ring offline';
+    txt('ov-status-text', 'OFFLINE', 'red');
+    txt('ov-sync-status', 'OFFLINE', 'red');
+    if (!_healthWasDown) addLog('Node unreachable — check the client is still running', 'err');
+    _healthWasDown = true;
     return;
   }
+  if (_healthWasDown) addLog('Node back online', 'ok');
+  _healthWasDown = false;
   nodeData = data;
 
   // Header
@@ -1137,22 +1181,29 @@ async function loadLlmStatus() {
 
 // ── Stake overview summary ────────────────────────────────────────────────────
 function refreshOvStake() {
+  const reqText = _stakeConfig?.minRequired != null ? _stakeConfig.minRequired.toLocaleString() + ' CIRC' : '—';
   if (!_stakeWallet) {
     txt('ov-stake-wallet', 'Not connected');
-    txt('ov-stake-status', '—');
-    txt('ov-stake-amount', '—');
-    txt('ov-stake-req',    _stakeConfig ? _stakeConfig.minRequired?.toLocaleString() + ' CIRC' : '—', 'amber');
+    txt('ov-stake-status', '—', '');
+    txt('ov-stake-amount', '—', '');
+    txt('ov-stake-req',    reqText, 'amber');
     txt('ov-stake-rpc',    'Locked', 'red');
     return;
   }
-  const label   = $('stake-access-label');
-  const eligible = label?.textContent?.includes('UNLOCKED') ?? false;
-  const amtEl   = $('stake-amount-display');
-  const reqEl   = $('stake-req-display');
   txt('ov-stake-wallet', _stakeWallet.slice(0,4) + '…' + _stakeWallet.slice(-4));
+  // Read from the cached stake result, not from another element's text — so the
+  // Overview is correct even before the Staking tab has been opened.
+  if (!_stakeResult) {
+    txt('ov-stake-status', 'CHECKING…', 'amber');
+    txt('ov-stake-amount', '—', '');
+    txt('ov-stake-req',    reqText, 'amber');
+    txt('ov-stake-rpc',    '—', '');
+    return;
+  }
+  const { eligible, staked, minReq } = _stakeResult;
   txt('ov-stake-status', eligible ? '● UNLOCKED' : '○ STAKE REQUIRED', eligible ? 'green' : 'red');
-  txt('ov-stake-amount', amtEl?.textContent ?? '—', eligible ? 'green' : 'red');
-  txt('ov-stake-req',    reqEl?.textContent ?? '—', 'amber');
+  txt('ov-stake-amount', staked.toLocaleString(undefined, {maximumFractionDigits: 2}) + ' CIRC', eligible ? 'green' : 'red');
+  txt('ov-stake-req',    minReq.toLocaleString() + ' CIRC', 'amber');
   txt('ov-stake-rpc',    eligible ? 'OPEN' : 'LOCKED', eligible ? 'green' : 'red');
 }
 
@@ -1534,7 +1585,7 @@ function renderCloud() {
   txt('cl-nodeid', h.nodeId || '—');
   txt('cl-cp',     h.controlPlane || 'not set');
   txt('cl-budget', h.budget ? `${h.budget.maxAgents} agents · ${h.budget.maxMemoryMb}MB` : '—');
-  txt('cl-updated', h.updatedAt ? fmtAgo(new Date(h.updatedAt).toISOString()) : '—');
+  txt('cl-updated', fmtAgo(h.updatedAt));   // fmtAgo is null/invalid-safe; no toISOString() that could throw
 
   const agents = d.agents || [];
   const box = $('cl-agents-list');
@@ -1728,6 +1779,7 @@ function _chatStatus(connected, text) {
 // ── Staking Access ────────────────────────────────────────────────────────────
 let _stakeWallet = localStorage.getItem('stake_wallet') || null;
 let _stakeConfig = null;
+let _stakeResult = null;   // last checkStake() result: { eligible, staked, minReq } — source of truth for the Overview/RPC summaries
 
 async function loadStakeConfig() {
   const data = await api('/stake/check');
@@ -1774,9 +1826,15 @@ function _refreshRpcStakeSummary() {
     minEl.className = 'kv-v amber';
   }
   if (stEl) {
-    const label = $('stake-access-label');
-    stEl.textContent = label?.textContent ?? '—';
-    stEl.className = 'kv-v ' + (_stakeWallet ? (label?.textContent?.includes('UNLOCKED') ? 'green' : 'red') : '');
+    // Drive off the cached stake result, not the Staking-tab label's text.
+    if (!_stakeWallet) {
+      stEl.textContent = 'Not connected'; stEl.className = 'kv-v';
+    } else if (!_stakeResult) {
+      stEl.textContent = 'CHECKING…'; stEl.className = 'kv-v amber';
+    } else {
+      stEl.textContent = _stakeResult.eligible ? '● UNLOCKED' : '○ STAKE REQUIRED';
+      stEl.className = 'kv-v ' + (_stakeResult.eligible ? 'green' : 'red');
+    }
   }
 }
 
@@ -1894,9 +1952,11 @@ async function checkStake(wallet) {
   $('stake-loading').style.display = 'none';
 
   if (!data || !data.configured) {
+    _stakeResult = null;
     $('stake-connect-prompt').style.display = 'block';
     txt('stake-access-label', 'POOL NOT CONFIGURED', 'checking');
     txt('stake-wallet-display', wallet.slice(0,4) + '…' + wallet.slice(-4));
+    refreshOvStake();
     return;
   }
 
@@ -1910,6 +1970,7 @@ async function checkStake(wallet) {
 
   const staked = data.stakedAmount ?? 0;
   const minReq = data.minRequired  ?? 0;
+  _stakeResult = { eligible: !!data.eligible, staked, minReq };
   txt('stake-req-display',    minReq.toLocaleString() + ' CIRC');
   txt('stake-amount-display', staked.toLocaleString(undefined, {maximumFractionDigits: 2}) + ' CIRC',
     staked >= minReq ? 'green' : 'red');
@@ -1966,13 +2027,12 @@ async function checkStake(wallet) {
 // ── Inference Chat ────────────────────────────────────────────────────────────
 let inferPending  = false;
 let inferMessages = [];  // { role, content }
-let inferLoaded   = false;
 
 async function renderInference() {
-  if (!inferLoaded) {
-    inferLoaded = true;
-    await _inferCheckStatus();
-  }
+  // Re-check every time the Chat tab opens — the coordinator may have come up since
+  // the first visit. Previously this ran once, so an early visit left Chat stuck on
+  // "unavailable" (Send disabled) until a full page reload.
+  await _inferCheckStatus();
 }
 
 // ── DLLM tab: model + mesh + this node's worker contribution + settings ──
@@ -2211,8 +2271,6 @@ function setupGpu() {
     '<span style="color:var(--muted)">Windows (Admin PowerShell):</span> <code style="color:var(--green)">irm https://circuitllm.xyz/join.ps1 | iex</code><br>' +
     '<span style="color:var(--muted)">(On Windows use the PowerShell line — pasting the curl line into PowerShell won\'t work.)</span>';
 }
-
-function fmtUptime(s) { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m ${s % 60}s`; }
 
 async function _inferCheckStatus() {
   const dot = $('infer-dot');
