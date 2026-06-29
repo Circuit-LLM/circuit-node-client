@@ -2494,6 +2494,7 @@ async function init() {
     if ($('panel-agent')?.classList.contains('active'))   await loadAgentData();
     if ($('panel-cloud')?.classList.contains('active'))   { await loadCloudData(); await loadSetup(); }
     if ($('panel-dllm')?.classList.contains('active'))    await loadSetup();
+    if ($('panel-network')?.classList.contains('active')) await loadHubStatus();  // re-probe hub so a transient "unreachable" self-heals
     if ($('panel-staking')?.classList.contains('active') && _stakeWallet) await checkStake(_stakeWallet);
   }, 15_000);
 }
