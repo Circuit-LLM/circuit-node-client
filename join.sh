@@ -132,27 +132,54 @@ if [ -z "$ADV_HOST" ] && [ -z "${CIRCUIT_RELAY_URL:-}" ]; then
 fi
 
 # ── 5. pull + run ─────────────────────────────────────────────────────────────────────────
-# On WSL the ghcr.io pull TLS-errors when the MTU is too high. Try the pull, and on failure lower the
-# eth0 MTU and retry — 1400 fails on some links, 1280 is the usual floor, 1200 for stubborn VPNs.
+# On WSL2 the ghcr.io pull TLS-errors ("tls: error decoding message") from mis-sized packets.
+# Just lowering the interface MTU isn't enough — WSL2 often ignores it and the daemon caches its
+# egress sizing. The reliable fix for native docker-in-WSL is to set the DAEMON's MTU + clamp
+# outbound TCP MSS + restart docker so the pull's TLS records are small, retrying down a ladder.
+_restart_docker() {
+  run systemctl restart docker 2>/dev/null && { sleep 3; return; }
+  run service docker restart 2>/dev/null && { sleep 3; return; }
+  run pkill -x dockerd 2>/dev/null || true; sleep 1
+  run sh -c 'nohup dockerd >/tmp/circuit-dockerd.log 2>&1 &' 2>/dev/null || true; sleep 4
+}
+_set_daemon_mtu() {  # $1 = mtu — merge into /etc/docker/daemon.json without dropping other keys
+  run python3 - "$1" <<'PYMTU' 2>/dev/null || true
+import json, os, sys
+p = '/etc/docker/daemon.json'
+d = {}
+try:
+    if os.path.exists(p) and os.path.getsize(p) > 0:
+        d = json.load(open(p))
+except Exception:
+    d = {}
+d['mtu'] = int(sys.argv[1])
+json.dump(d, open(p, 'w'))
+PYMTU
+}
 pull_image() {
   if [ -z "$IS_WSL" ]; then say "pulling $IMAGE …"; run docker pull "$IMAGE" >/dev/null; return; fi
-  local mtu ok=""
-  for mtu in ${CIRCUIT_MTU:-} 1400 1280 1200; do
+  local mtu ok="" mss
+  for mtu in ${CIRCUIT_MTU:-} 1280 1200 1100 1024; do
     [ -n "$mtu" ] || continue
+    mss=$((mtu - 40))
     run ip link set dev "$IFACE" mtu "$mtu" 2>/dev/null || true
-    say "pulling $IMAGE  ($IFACE MTU $mtu) …"
+    # clamp outbound TCP MSS — the most reliable guard against TLS fragmentation (no-op if already set)
+    run iptables -t mangle -C POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss "$mss" 2>/dev/null \
+      || run iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss "$mss" 2>/dev/null || true
+    _set_daemon_mtu "$mtu"
+    _restart_docker
+    for _ in 1 2 3 4 5 6 7 8; do run docker info >/dev/null 2>&1 && break; sleep 2; done
+    say "pulling $IMAGE  (Docker MTU $mtu) …"
     if run docker pull "$IMAGE" >/dev/null 2>&1; then ok="$mtu"; break; fi
     warn "pull failed at MTU $mtu — lowering and retrying…"
   done
-  [ -n "$ok" ] || die "the image pull keeps TLS-failing even at MTU 1200.
-     This is usually a VPN/proxy, or Docker Desktop (whose daemon ignores this distro's MTU):
-       • Docker Desktop:  Settings → Docker Engine → add  \"mtu\": 1280  → Apply & Restart, then re-run.
-       • On a VPN/corporate net:  disconnect it (or set  CIRCUIT_MTU=1200) and re-run.
-     Re-run with:  curl -fsSL https://circuitllm.xyz/join | bash"
+  [ -n "$ok" ] || die "the image pull keeps TLS-failing even at MTU 1024.
+     This is almost always a VPN or corporate proxy mangling TLS. Disconnect it and re-run:
+       curl -fsSL https://circuitllm.xyz/join | bash
+     (or force an even lower MTU:  CIRCUIT_MTU=1000 curl -fsSL https://circuitllm.xyz/join | bash )"
   ok "image pulled (MTU $mtu)"
-  # persist the working MTU + size the container bridge to match
+  # persist the working MTU across WSL reboots
   grep -q "set dev $IFACE mtu" /etc/wsl.conf 2>/dev/null || printf '\n[boot]\ncommand = ip link set dev %s mtu %s\n' "$IFACE" "$ok" | run tee -a /etc/wsl.conf >/dev/null 2>&1 || true
-  run python3 -c "import json,os; p='/etc/docker/daemon.json'; d=json.load(open(p)) if os.path.exists(p) else {}; d['mtu']=$ok; json.dump(d, open(p,'w'))" 2>/dev/null || true
 }
 pull_image
 run docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
