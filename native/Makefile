@@ -1,6 +1,7 @@
 # Makefile for circuit-runner — native ggml layer runner
 
-GGML_BINS   := /home/watchtower/circuit-decentralized-llm/node_modules/@node-llama-cpp/linux-x64/bins/linux-x64
+# Override with `make GGML_BINS=/path/to/@node-llama-cpp/.../bins/linux-x64` (or set it in the env).
+GGML_BINS   ?= $(HOME)/circuit-decentralized-llm/node_modules/@node-llama-cpp/linux-x64/bins/linux-x64
 GGML_INCL   := /tmp/llama-cpp-src/ggml/include
 
 CC       := gcc

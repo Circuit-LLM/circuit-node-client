@@ -15,15 +15,14 @@ function _findBin(paths) {
 }
 
 const CUDA_RUNNER_BIN = _findBin([
+  process.env.CIRCUIT_RUNNER_CUDA_BIN,
   path.join(__dirname, 'native', 'circuit-runner-cuda'),
-  '/workspace/circuit-node-client/native/circuit-runner-cuda',
-]);
+].filter(Boolean));
 
 const CPU_RUNNER_BIN = _findBin([
+  process.env.CIRCUIT_RUNNER_BIN,
   path.join(__dirname, 'native', 'circuit-runner'),
-  '/home/watchtower/circuit-node-client/native/circuit-runner',
-  '/workspace/circuit-node-client/native/circuit-runner',
-]);
+].filter(Boolean));
 
 // "Is any native runner available" — used to gate _tryInitNative(). The actual
 // binary (CPU vs CUDA) is chosen inside NativeRunner based on gpuLayers.
