@@ -203,61 +203,109 @@ tr:last-child td{border-bottom:none}
   .chips-4,.chips-3{grid-template-columns:1fr 1fr}
   .hdr-stats .hstat:nth-child(n+4){display:none}
 }
+
+/* ══════════ Command-sidebar shell + polished controls (redesign) ══════════ */
+:root{--c5:#221a00;--c4:#3d3100;--green2:#1e4020;--green3:#0a1f0a;--amber2:#c06800}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent 0,transparent 1px,rgba(255,224,0,.010) 1px,rgba(255,224,0,.010) 2px);pointer-events:none;z-index:0}
+#shell{display:flex;height:100vh;min-height:0;position:relative;z-index:1}
+#sidebar{width:216px;flex-shrink:0;background:var(--s1);border-right:1px solid var(--border2);display:flex;flex-direction:column;height:100vh;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;transition:width .16s ease}
+#sidebar::-webkit-scrollbar{display:none}
+body.sb-collapsed #sidebar{width:52px}
+#content{flex:1;min-width:0;height:100vh;display:flex;flex-direction:column}
+#topbar{height:40px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:var(--s1);border-bottom:1px solid var(--border2);position:relative}
+#topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,224,0,.2),transparent);pointer-events:none}
+.tb-title{font-size:12px;font-weight:700;letter-spacing:.18em;color:var(--yellow);text-shadow:0 0 8px rgba(255,224,0,.4)}
+.tb-right{display:flex;align-items:center;gap:12px;font-size:10px;color:var(--muted)}
+.tb-clock{font-variant-numeric:tabular-nums;letter-spacing:.08em}
+.sb-brand{display:flex;align-items:center;gap:8px;height:48px;padding:0 14px;border-bottom:1px solid var(--border2);flex-shrink:0}
+.sb-brand-name{color:var(--yellow);font-size:12px;font-weight:700;letter-spacing:.14em;white-space:nowrap;overflow:hidden;flex:1;text-shadow:0 0 8px rgba(255,224,0,.4)}
+.sb-collapse{cursor:pointer;color:var(--dim);font-size:16px;padding:2px 5px;user-select:none;line-height:1}
+.sb-collapse:hover{color:var(--yellow)}
+body.sb-collapsed .sb-brand-name{display:none}
+body.sb-collapsed .sb-brand{justify-content:center;padding:0}
+.sb-mini{display:none}
+body.sb-collapsed .sb-mini{display:none}
+.sb-vitals{padding:12px 14px;border-bottom:1px solid var(--border2);display:flex;flex-direction:column;gap:9px}
+body.sb-collapsed .sb-vitals{display:none}
+.sb-mode{display:inline-flex;align-items:center;gap:6px;font-size:9px;letter-spacing:.16em;padding:3px 9px;border:1px solid var(--border2);color:var(--gold);width:fit-content;text-transform:uppercase}
+.sb-mode.green{border-color:var(--green2);color:var(--green)}
+.sb-mode.amber{border-color:var(--amber2);color:var(--amber)}
+.sb-mode.red{border-color:var(--red);color:var(--red)}
+.sb-vital{display:flex;flex-direction:column;gap:1px;min-width:0}
+.sb-vital .lbl{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.sb-vital .val{font-size:14px;color:var(--bright);font-weight:700;font-variant-numeric:tabular-nums;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-vital .val.green{color:var(--green)}.sb-vital .val.amber{color:var(--amber)}.sb-vital .val.red{color:var(--red)}
+.sb-vital-row{display:flex;gap:14px}.sb-vital-row .sb-vital{flex:1}
+.sb-addr{font-size:9px;color:var(--dim);word-break:break-all;line-height:1.3}
+.sb-nav-wrap{display:flex;flex-direction:column;padding:6px 0;flex:1}
+.sb-nav{display:flex;align-items:center;gap:12px;padding:9px 16px;cursor:pointer;color:var(--muted);border-left:2px solid transparent;transition:background .12s,color .12s;user-select:none;white-space:nowrap}
+.sb-nav:hover{color:var(--text);background:var(--s2)}
+.sb-nav.active{color:var(--yellow);border-left-color:var(--yellow);background:var(--c5)}
+.sb-ico{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.sb-label{font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+.sb-badge{font-size:8px;background:var(--c4);color:var(--gold);padding:1px 5px;margin-left:auto;letter-spacing:.06em}
+body.sb-collapsed .sb-label,body.sb-collapsed .sb-badge{display:none}
+body.sb-collapsed .sb-nav{justify-content:center;padding:9px 0;gap:0}
+.sb-foot{padding:10px 14px;border-top:1px solid var(--border2);display:flex;flex-direction:column;gap:5px}
+.sb-foot a{font-size:9px;letter-spacing:.06em;color:var(--dim);text-decoration:none}
+.sb-foot a:hover{color:var(--gold)}
+body.sb-collapsed .sb-foot{display:none}
+/* polished range slider + readout (connect forms) */
+.adv-row input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:6px;background:var(--c5);border:1px solid var(--border);outline:none;cursor:pointer}
+.adv-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;background:var(--yellow);border:1px solid var(--bg);cursor:pointer;box-shadow:0 0 4px rgba(255,224,0,.4)}
+.adv-row input[type=range]::-moz-range-thumb{width:15px;height:15px;background:var(--yellow);border:1px solid var(--bg);cursor:pointer;border-radius:0}
+.adv-row .av{color:var(--bright);font-weight:700}
 </style>
 </head>
 <body>
+<script>try{if(localStorage.getItem('nc_sbCollapsed')==='1')document.body.classList.add('sb-collapsed')}catch(e){}</script>
 
 <!-- ── Header ── -->
-<header class="hdr">
-  <div class="hdr-logo">
-    <div class="hdr-logo-title">CIRCUIT NODE</div>
-    <div class="hdr-logo-sub">DISTRIBUTED NETWORK CLIENT</div>
-  </div>
-  <div class="hdr-stats">
-    <div class="hstat">
-      <div class="hstat-l">STATUS</div>
-      <div class="hstat-v green" id="h-status">ONLINE</div>
+<div id="shell">
+  <aside id="sidebar">
+    <div class="sb-brand">
+      <div class="live-dot" id="live-dot"></div>
+      <span class="sb-brand-name">CIRCUIT NODE</span>
+      <span class="sb-collapse" id="sb-collapse" onclick="toggleSidebar()" title="Collapse / expand (Ctrl+\\)">&lsaquo;</span>
     </div>
-    <div class="hstat">
-      <div class="hstat-l">VERSION</div>
-      <div class="hstat-v" id="h-version">—</div>
+    <div class="sb-mini"><div class="live-dot" style="animation:none"></div></div>
+    <div class="sb-vitals">
+      <span class="sb-mode green" id="h-status">ONLINE</span>
+      <div class="sb-vital-row">
+        <div class="sb-vital"><span class="lbl">Version</span><span class="val" id="h-version">&mdash;</span></div>
+        <div class="sb-vital"><span class="lbl">Uptime</span><span class="val" id="h-uptime">&mdash;</span></div>
+      </div>
+      <div class="sb-vital-row">
+        <div class="sb-vital"><span class="lbl">Peers</span><span class="val green" id="h-peers">&mdash;</span></div>
+        <div class="sb-vital"><span class="lbl">Sync</span><span class="val" id="h-sync">&mdash;</span></div>
+      </div>
+      <div class="sb-vital"><span class="lbl">Agent</span><span class="val" id="h-agent">&mdash;</span></div>
+      <div class="sb-vital"><span class="lbl">Node ID</span><span class="sb-addr" id="hdr-node-id">loading&hellip;</span></div>
     </div>
-    <div class="hstat">
-      <div class="hstat-l">UPTIME</div>
-      <div class="hstat-v" id="h-uptime">—</div>
+    <nav class="sb-nav-wrap">
+      <div class="sb-nav active" data-tab="overview" title="Overview" onclick="showTab('overview')"><span class="sb-ico">&#9636;</span><span class="sb-label">Overview</span></div>
+      <div class="sb-nav" data-tab="network" title="Network" onclick="showTab('network')"><span class="sb-ico">&#8904;</span><span class="sb-label">Network</span></div>
+      <div class="sb-nav" data-tab="staking" title="Staking" id="tab-staking" onclick="showTab('staking')"><span class="sb-ico">&#9672;</span><span class="sb-label">Staking</span></div>
+      <div class="sb-nav" data-tab="dllm" title="DLLM" id="tab-dllm" onclick="showTab('dllm')"><span class="sb-ico">&#9004;</span><span class="sb-label">DLLM</span></div>
+      <div class="sb-nav" data-tab="cloud" title="Cloud" onclick="showTab('cloud')"><span class="sb-ico">&#9729;</span><span class="sb-label">Cloud</span></div>
+      <div class="sb-nav" data-tab="inference" title="Chat" id="tab-inference" onclick="showTab('inference')"><span class="sb-ico">&#9998;</span><span class="sb-label">Chat</span></div>
+      <div class="sb-nav" data-tab="agent" title="Agent" onclick="showTab('agent')"><span class="sb-ico">&#9678;</span><span class="sb-label">Agent</span></div>
+      <div class="sb-nav" data-tab="chat" title="Agent Chat" id="tab-chat" onclick="showTab('chat')"><span class="sb-ico">&#10042;</span><span class="sb-label">Agent Chat</span></div>
+      <div class="sb-nav" data-tab="rpc" title="RPC Key" onclick="showTab('rpc')"><span class="sb-ico">&#9919;</span><span class="sb-label">RPC Key</span></div>
+      <div class="sb-nav" data-tab="updates" title="Updates" onclick="showTab('updates')"><span class="sb-ico">&#8635;</span><span class="sb-label">Updates</span></div>
+    </nav>
+    <div class="sb-foot">
+      <a href="https://circuitllm.xyz" target="_blank">circuitllm.xyz &#8599;</a>
+      <a href="https://circuitllm.xyz/data" target="_blank">OPS Terminal &#8599;</a>
     </div>
-    <div class="hstat">
-      <div class="hstat-l">NETWORK PEERS</div>
-      <div class="hstat-v green" id="h-peers">—</div>
-    </div>
-    <div class="hstat">
-      <div class="hstat-l">SYNC</div>
-      <div class="hstat-v" id="h-sync">—</div>
-    </div>
-    <div class="hstat">
-      <div class="hstat-l">AGENT</div>
-      <div class="hstat-v" id="h-agent">—</div>
-    </div>
-  </div>
-  <div class="hdr-right">
-    <div class="live-dot" id="live-dot"></div>
-    <div class="hdr-node-id" id="hdr-node-id">loading…</div>
-  </div>
-</header>
+  </aside>
 
 <!-- ── Tabs ── -->
-<nav class="tabs">
-  <div class="tab active" onclick="showTab('overview')"><span class="dot"></span>OVERVIEW</div>
-  <div class="tab" onclick="showTab('network')"><span class="dot"></span>NETWORK</div>
-  <div class="tab" onclick="showTab('staking')" id="tab-staking"><span class="dot"></span>STAKING</div>
-  <div class="tab" onclick="showTab('dllm')" id="tab-dllm"><span class="dot"></span>DLLM</div>
-  <div class="tab" onclick="showTab('cloud')"><span class="dot"></span>CLOUD</div>
-  <div class="tab" onclick="showTab('inference')" id="tab-inference"><span class="dot"></span>CHAT</div>
-  <div class="tab" onclick="showTab('agent')"><span class="dot"></span>AGENT</div>
-  <div class="tab" onclick="showTab('chat')" id="tab-chat"><span class="dot"></span>AGENT CHAT</div>
-  <div class="tab" onclick="showTab('rpc')"><span class="dot"></span>RPC KEY</div>
-  <div class="tab" onclick="showTab('updates')"><span class="dot"></span>UPDATES</div>
-</nav>
+<div id="content">
+  <div id="topbar">
+    <span class="tb-title" id="tb-title">OVERVIEW</span>
+    <div class="tb-right"><span class="tb-clock" id="tb-clock"></span></div>
+  </div>
 
 <!-- ── Main ── -->
 <main class="main">
@@ -750,7 +798,7 @@ tr:last-child td{border-bottom:none}
         .adv-toggle:hover{color:#d8cc90}
         .adv-row{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:10px;color:var(--muted)}
         .adv-row label{flex:0 0 90px;letter-spacing:.06em}
-        .adv-row input[type=range]{flex:1;accent-color:var(--green)}
+        /* range slider is fully styled in the <head> block (.adv-row input[type=range]) — no accent-color override here */
         .adv-row .av{flex:0 0 56px;text-align:right;color:#d8cc90;font-size:11px}
         .connect-wallet{width:100%;background:#09080a;border:1px solid #3a2e00;color:#d8cc90;font-family:inherit;font-size:11px;padding:9px 10px;border-radius:6px;outline:none;margin:8px 0}
         .connect-wallet:focus{border-color:var(--green)}
@@ -982,6 +1030,8 @@ tr:last-child td{border-bottom:none}
   </section>
 
 </main>
+  </div><!-- /#content -->
+</div><!-- /#shell -->
 
 <script>
 'use strict';
@@ -1046,11 +1096,10 @@ async function api(path) {
 
 function showTab(id) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   $('panel-' + id)?.classList.add('active');
-  document.querySelectorAll('.tab').forEach(t => {
-    if (t.getAttribute('onclick')?.includes(id)) t.classList.add('active');
-  });
+  document.querySelectorAll('.sb-nav').forEach(t => t.classList.toggle('active', t.dataset.tab === id));
+  const _tt = $('tb-title'), _al = document.querySelector('.sb-nav.active .sb-label');
+  if (_tt) _tt.textContent = (_al ? _al.textContent : id).toUpperCase();
   if (id === 'network')    renderNetwork();
   if (id === 'updates')    renderUpdates();
   if (id === 'agent')      { loadAgentData(); }
@@ -1061,6 +1110,19 @@ function showTab(id) {
   if (id === 'staking')    loadStakeConfig();
   if (id === 'rpc')        { _refreshRpcStakeSummary(); renderAdminAccess(); }
 }
+
+function toggleSidebar(){
+  const c=document.body.classList.toggle('sb-collapsed');
+  try{localStorage.setItem('nc_sbCollapsed',c?'1':'0');}catch(e){}
+  const b=$('sb-collapse'); if(b)b.textContent=c?'\u203a':'\u2039';
+}
+(function initShell(){
+  const b=$('sb-collapse');
+  if(b&&document.body.classList.contains('sb-collapsed'))b.textContent='\u203a';
+  document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='\\'){e.preventDefault();toggleSidebar();}});
+  const clk=$('tb-clock');
+  if(clk){const tick=()=>{try{clk.textContent=new Date().toLocaleTimeString();}catch(e){}};tick();setInterval(tick,1000);}
+})();
 
 function addLog(msg, type = '') {
   const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1148,7 +1210,7 @@ async function loadStatus() {
   }
 
   // Header node ID
-  txt('hdr-node-id', 'ID: ' + (data.nodeId ?? '—'));
+  txt('hdr-node-id', data.nodeId ?? '—');
 
   // Overview panel
   txt('ov-nodeid', data.nodeId ?? '—');
