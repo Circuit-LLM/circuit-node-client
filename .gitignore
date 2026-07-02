@@ -34,3 +34,6 @@ native/cuda-libs/
 .DS_Store
 Thumbs.db
 data/identity-worker*.json
+
+# local dashboard safety backups
+*.bak
