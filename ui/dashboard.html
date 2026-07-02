@@ -24,6 +24,7 @@
   --text:#efe6c2;--muted:#bfb184;--dim:#6a5d2b;--bright:#fff1b4;
   /* signal ramp (── brand-critical: keep --yellow on CIRCUIT gold ──) */
   --yellow:#ffe000;--gold:#dcb820;--gold-soft:#f2d766;
+  --head:#dcb820;   /* header lettering — restrained antique gold, no glow (title/brand/active-nav/card-titles) */
   --amber:#ffa42a;--amber2:#c06800;--red:#ff5c5c;
   --green:#9be27a;--green2:#2c5a2e;--green3:#0a1f0a;
   --teal:#dcb820;
@@ -67,9 +68,8 @@ body.sb-collapsed #sidebar{width:54px}
 .sb-glyph{width:20px;height:20px;flex-shrink:0;display:block;filter:drop-shadow(0 0 5px var(--glow))}
 .sb-glyph .spin{transform-origin:16px 16px;animation:glyphspin 14s linear infinite}
 @keyframes glyphspin{to{transform:rotate(360deg)}}
-.sb-brand-name{color:var(--yellow);font-family:var(--font-ui);font-size:12px;font-weight:800;
-  letter-spacing:.16em;white-space:nowrap;overflow:hidden;flex:1;
-  text-shadow:0 0 10px var(--glow)}
+.sb-brand-name{color:var(--head);font-family:var(--font-ui);font-size:12px;font-weight:800;
+  letter-spacing:.16em;white-space:nowrap;overflow:hidden;flex:1}
 .sb-collapse{cursor:pointer;color:var(--dim);font-size:16px;padding:2px 5px;user-select:none;line-height:1;transition:color .15s}
 .sb-collapse:hover{color:var(--yellow)}
 body.sb-collapsed .sb-brand-name{display:none}
@@ -101,10 +101,10 @@ body.sb-collapsed .sb-vitals{display:none}
 .sb-nav{display:flex;align-items:center;gap:12px;padding:9px 16px;cursor:pointer;color:var(--muted);
   border-left:2px solid transparent;transition:background .14s,color .14s,box-shadow .14s;user-select:none;white-space:nowrap;position:relative}
 .sb-nav:hover{color:var(--text);background:var(--s2)}
-.sb-nav.active{color:var(--yellow);border-left-color:var(--yellow);
+.sb-nav.active{color:var(--head);border-left-color:var(--gold);
   background:linear-gradient(90deg,var(--c5),rgba(34,26,0,0));
-  box-shadow:inset 14px 0 22px -16px var(--glow)}
-.sb-nav.active .sb-ico{color:var(--yellow);text-shadow:0 0 9px var(--glow)}
+  box-shadow:inset 14px 0 22px -18px var(--glow)}
+.sb-nav.active .sb-ico{color:var(--head)}
 .sb-ico{font-size:14px;width:18px;text-align:center;flex-shrink:0;transition:transform .14s}
 .sb-nav:hover .sb-ico{transform:scale(1.12)}
 .sb-label{font-family:var(--font-ui);font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase}
@@ -131,7 +131,7 @@ body.sb-collapsed .sb-foot{display:none}
   background:linear-gradient(90deg,transparent,var(--yellow),transparent);
   filter:blur(.5px);animation:sweep 7s cubic-bezier(.5,0,.5,1) infinite}
 @keyframes sweep{0%{left:-26%;opacity:0}12%{opacity:1}88%{opacity:1}100%{left:100%;opacity:0}}
-.tb-title{font-family:var(--font-ui);font-size:12px;font-weight:800;letter-spacing:.22em;color:var(--yellow);text-shadow:0 0 10px var(--glow)}
+.tb-title{font-family:var(--font-ui);font-size:12px;font-weight:800;letter-spacing:.22em;color:var(--head)}
 .tb-right{display:flex;align-items:center;gap:14px;font-size:10px;color:var(--muted)}
 .tb-clock{font-family:var(--font);font-variant-numeric:tabular-nums;letter-spacing:.1em;color:var(--gold-soft)}
 
@@ -163,7 +163,7 @@ body.sb-collapsed .sb-foot{display:none}
 .card::before{top:5px;left:5px;border-top:1px solid var(--gold);border-left:1px solid var(--gold);opacity:.85}
 .card::after{bottom:5px;right:5px;border-bottom:1px solid var(--gold);border-right:1px solid var(--gold);opacity:.4}
 .card:hover::before,.card:hover::after{opacity:1;width:12px;height:12px}
-.card-t{font-family:var(--font-ui);font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-soft);
+.card-t{font-family:var(--font-ui);font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--head);
   margin:-15px -17px 13px;padding:9px 16px 9px 22px;position:relative;display:flex;justify-content:space-between;align-items:center;
   background:linear-gradient(90deg,var(--s2),rgba(22,19,10,0));border-bottom:1px solid var(--border)}
 .card-t::before{content:'';position:absolute;left:11px;top:50%;transform:translateY(-50%);width:4px;height:4px;
