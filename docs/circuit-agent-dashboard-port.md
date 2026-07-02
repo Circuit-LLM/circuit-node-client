@@ -19,17 +19,24 @@ A precise console aesthetic, not a theme swap. Five principles:
    headings, buttons), mono for *data* (values, addresses, code, tables,
    numbers). This one change is what makes it read "designed" instead of
    "terminal dump." Everything numeric gets `font-variant-numeric:tabular-nums`.
-2. **Layered carbon + two golds.** Near‑black warm surfaces stacked with
-   subtle top‑highlight (`inset 0 1px 0 rgba(255,232,150,.055)`) and soft
-   shadows for depth. Split gold into two roles and don't mix them:
-   - **`--head:#dcb820` — header lettering** (topbar title, brand, active‑nav,
-     card titles). Restrained antique gold, **crisp / no glow.** Big uppercase
-     type in bright `#ffe000` + glow reads neon/shiny — this is the lesson from
-     the node‑client polish pass (a real piece of user feedback). Lettering is
-     calm; it does not glow.
-   - **`--yellow:#ffe000` — the functional signal** (live dot, status rings,
-     metric hero numbers, CTAs, slider fill/thumb, selected‑preset). This is the
-     *only* thing that glows, and it stays bright.
+2. **Layered carbon + antique gold; bright reserved for "live".** Near‑black warm
+   surfaces stacked with subtle top‑highlight (`inset 0 1px 0 rgba(255,232,150,.055)`)
+   and soft shadows for depth. Almost everything gold is **antique** — one warm
+   tone, calm, no neon:
+   - **`--head` / `--gold` = `#dcb820`** — header lettering (title, brand,
+     active‑nav, card titles), **and** buttons/CTAs (flat fill, dark text, no
+     glow), hover text, selected states (pills/toggles/filters), metric numbers,
+     slider readouts/thumbs. Bright `#ffe000` + glow on any of these reads
+     neon/shiny — the repeated lesson from two rounds of user feedback. On the
+     node‑client, `--yellow` was **repurposed** to `#dcb820` so all of the above
+     move together from one token.
+   - **`--live` = `#ffe000`** — the ONLY bright, glowing signal, reserved for
+     genuine live/pulsing status: the live dot, the "online" status ring, the
+     chat‑connected dot. (On circuit‑agent these are already `--green`, so there
+     may be nothing to keep bright at all.) Plus the small brand glyph SVG stays
+     bright — it's a logo mark, not lettering.
+   - Warm the glow halos too: `--glow` → `rgba(224,192,60,…)` so focus rings /
+     card‑title dots / slider thumbs glow *gold*, not lime.
    Don't introduce competing hues.
 3. **A repeated motif.** Cards are "targeting reticles": corner brackets
    (`::before`/`::after`) that brighten and grow on hover, plus a leading dot +
@@ -83,8 +90,8 @@ toggles them on positions, trades, and unrealized‑P&L.
 **Do NOT fold green into gold on the agent dashboard.** Keep this split:
 
 ```css
---head:#dcb820;     /* header lettering — antique gold, NO glow            */
---yellow:#ffe000;   /* functional signal — glows: dots, rings, CTAs, metrics */
+--head:#dcb820;     /* antique gold — headers, buttons/CTAs, hover, selected, metrics, readouts */
+--live:#ffe000;     /* ONLY bright/glowing — live dot, online ring, connected dot (agent: usually --green) */
 --green:#7acc60;    /* P&L up  — KEEP true green (money), do not remap     */
 --red:#e04444;      /* P&L down — KEEP true red                           */
 --amber:#ffa42a;    /* warnings / pending                                 */
