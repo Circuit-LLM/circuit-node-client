@@ -19,9 +19,17 @@ A precise console aesthetic, not a theme swap. Five principles:
    headings, buttons), mono for *data* (values, addresses, code, tables,
    numbers). This one change is what makes it read "designed" instead of
    "terminal dump." Everything numeric gets `font-variant-numeric:tabular-nums`.
-2. **Layered carbon + one signal color.** Near‑black warm surfaces stacked with
+2. **Layered carbon + two golds.** Near‑black warm surfaces stacked with
    subtle top‑highlight (`inset 0 1px 0 rgba(255,232,150,.055)`) and soft
-   shadows for depth. Gold (`--yellow:#ffe000`) is the *only* accent that glows.
+   shadows for depth. Split gold into two roles and don't mix them:
+   - **`--head:#dcb820` — header lettering** (topbar title, brand, active‑nav,
+     card titles). Restrained antique gold, **crisp / no glow.** Big uppercase
+     type in bright `#ffe000` + glow reads neon/shiny — this is the lesson from
+     the node‑client polish pass (a real piece of user feedback). Lettering is
+     calm; it does not glow.
+   - **`--yellow:#ffe000` — the functional signal** (live dot, status rings,
+     metric hero numbers, CTAs, slider fill/thumb, selected‑preset). This is the
+     *only* thing that glows, and it stays bright.
    Don't introduce competing hues.
 3. **A repeated motif.** Cards are "targeting reticles": corner brackets
    (`::before`/`::after`) that brighten and grow on hover, plus a leading dot +
@@ -75,7 +83,8 @@ toggles them on positions, trades, and unrealized‑P&L.
 **Do NOT fold green into gold on the agent dashboard.** Keep this split:
 
 ```css
---yellow:#ffe000;   /* brand + interactive accent + "online/active" glow  */
+--head:#dcb820;     /* header lettering — antique gold, NO glow            */
+--yellow:#ffe000;   /* functional signal — glows: dots, rings, CTAs, metrics */
 --green:#7acc60;    /* P&L up  — KEEP true green (money), do not remap     */
 --red:#e04444;      /* P&L down — KEEP true red                           */
 --amber:#ffa42a;    /* warnings / pending                                 */
@@ -130,7 +139,7 @@ means "position is up/down," it must stay green/red. When unsure, leave it green
 .card::after{bottom:5px;right:5px;border-bottom:1px solid var(--gold);border-right:1px solid var(--gold);opacity:.4}
 .card:hover::before,.card:hover::after{opacity:1;width:12px;height:12px}
 .card-t{font-family:var(--font-ui);font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
-  color:var(--gold-soft);margin:-15px -17px 13px;padding:9px 16px 9px 22px;position:relative;display:flex;
+  color:var(--head);margin:-15px -17px 13px;padding:9px 16px 9px 22px;position:relative;display:flex;
   justify-content:space-between;align-items:center;background:linear-gradient(90deg,var(--s2),rgba(22,19,10,0));border-bottom:1px solid var(--border)}
 .card-t::before{content:'';position:absolute;left:11px;top:50%;transform:translateY(-50%);width:4px;height:4px;background:var(--gold);border-radius:50%;box-shadow:0 0 7px var(--glow)}
 .card-t::after{content:'';position:absolute;bottom:-1px;left:0;width:44px;height:1px;background:linear-gradient(90deg,var(--yellow),transparent)}
