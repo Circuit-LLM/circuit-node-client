@@ -2,6 +2,7 @@
 //
 // Usage:
 //   node node-client.js           — start the node (default)
+//   node node-client.js stop      — stop the running node (graceful; add --force for SIGKILL)
 //   node node-client.js setup     — interactive setup wizard
 //   node node-client.js status    — print current node status
 //   node node-client.js deregister — remove from network and exit
@@ -40,6 +41,31 @@ const { computeAssignment } = require('./lib/shard');
 
 const CONFIG_FILE  = path.join(__dirname, 'config', 'client.json');
 const EXAMPLE_FILE = path.join(__dirname, 'config', 'client.example.json');
+// PID file — lets `node node-client.js stop` find and signal a running node without
+// hunting for the process id. Written on start (runNode), removed on clean exit.
+const PID_FILE     = path.join(__dirname, 'data', 'node.pid');
+
+// True if a process with this pid is currently alive (signal 0 = liveness probe, no-op).
+function pidAlive(pid) {
+  if (!pid || Number.isNaN(pid)) return false;
+  try { process.kill(pid, 0); return true; }
+  catch (err) { return err.code === 'EPERM'; }   // EPERM → exists but not ours; still "alive"
+}
+// Read the pid recorded in PID_FILE (null if missing/garbage).
+function readPidFile() {
+  try {
+    const pid = parseInt(fs.readFileSync(PID_FILE, 'utf8').trim(), 10);
+    return Number.isNaN(pid) ? null : pid;
+  } catch { return null; }
+}
+function writePidFile() {
+  try { fs.mkdirSync(path.dirname(PID_FILE), { recursive: true }); fs.writeFileSync(PID_FILE, String(process.pid)); }
+  catch (err) { console.warn('[node-client] could not write PID file:', err.message); }
+}
+// Remove PID_FILE only if it still points at *us* — never clobber another instance's file.
+function clearOwnPidFile() {
+  try { if (readPidFile() === process.pid) fs.unlinkSync(PID_FILE); } catch {}
+}
 
 // ── Secret loader ─────────────────────────────────────────────────────────────
 // Priority: Infisical (VPS deployments) → process.env → null
@@ -138,6 +164,8 @@ if (command === 'setup') {
   runSetup();
 } else if (command === 'status') {
   runStatus();
+} else if (command === 'stop') {
+  runStop();
 } else if (command === 'deregister') {
   runDeregister();
 } else if (command === 'update') {
@@ -148,7 +176,10 @@ if (command === 'setup') {
   runNode();
 } else {
   console.error(`Unknown command: ${command}`);
-  console.error('Usage: node node-client.js [start|setup|status|update|rollback <version>|deregister]');
+  console.error('Usage: node node-client.js [start|stop|setup|status|update|rollback <version>|deregister]');
+  console.error('  start                 run the node (default)');
+  console.error('  stop [--force]        stop the running node (graceful; --force = SIGKILL)');
+  console.error('  status                print node status');
   process.exit(1);
 }
 
@@ -163,6 +194,17 @@ async function runNode() {
   console.log('');
 
   const config = loadConfig();
+
+  // Refuse to start a second copy in the same directory — a stray duplicate double-registers
+  // on the network and fights over the API port. A stale PID file (process already gone) is fine.
+  const existing = readPidFile();
+  if (existing && existing !== process.pid && pidAlive(existing)) {
+    console.error(`[node-client] A node already appears to be running here (pid ${existing}).`);
+    console.error(`[node-client] Stop it first:  node node-client.js stop   (or force: kill ${existing})`);
+    process.exit(1);
+  }
+  writePidFile();
+  process.on('exit', clearOwnPidFile);   // covers every exit path (shutdown, watchdog, uncaught)
 
   // Load or generate identity
   const id = identity.loadIdentity();
@@ -259,6 +301,55 @@ async function runNode() {
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT',  () => shutdown('SIGINT'));
+}
+
+// ── Stop a running node ─────────────────────────────────────────────────────
+// Reads data/node.pid and sends SIGTERM (the same graceful-shutdown path as Ctrl+C:
+// deregister from the network, then exit). Falls back to clear guidance if there is
+// no PID file — e.g. the node is managed by PM2 or systemd, which own the process.
+async function runStop() {
+  const force = process.argv.includes('--force') || process.argv.includes('-9');
+  const pid = readPidFile();
+
+  if (!pid) {
+    console.error('[node-client] No PID file (data/node.pid) — no node started from this directory, or it exited uncleanly.');
+    console.error('[node-client] If it is managed elsewhere:');
+    console.error('[node-client]   PM2:      pm2 stop <name>');
+    console.error('[node-client]   systemd:  sudo systemctl stop circuit-node-client');
+    console.error('[node-client]   manual:   pkill -f node-client.js   (Windows: taskkill /IM node.exe /F)');
+    process.exit(1);
+  }
+  if (!pidAlive(pid)) {
+    console.log(`[node-client] No process ${pid} running — clearing stale PID file.`);
+    clearOwnPidFileFor(pid);
+    process.exit(0);
+  }
+
+  const sig = force ? 'SIGKILL' : 'SIGTERM';
+  console.log(`[node-client] Stopping node (pid ${pid}) with ${sig}…`);
+  try { process.kill(pid, sig); }
+  catch (err) {
+    console.error(`[node-client] Could not signal ${pid}: ${err.message}`);
+    console.error(`[node-client] Try:  kill ${force ? '-9 ' : ''}${pid}`);
+    process.exit(1);
+  }
+  if (force) { console.log('[node-client] SIGKILL sent.'); clearOwnPidFileFor(pid); process.exit(0); }
+
+  // Poll up to ~10s for a clean exit; the node's own shutdown watchdog exits within ~6s.
+  const deadline = Date.now() + 10_000;
+  const poll = () => {
+    if (!pidAlive(pid)) { console.log('[node-client] Stopped.'); clearOwnPidFileFor(pid); process.exit(0); }
+    if (Date.now() > deadline) {
+      console.warn(`[node-client] Still running after 10s. Force-kill with:  node node-client.js stop --force  (or kill -9 ${pid})`);
+      process.exit(1);
+    }
+    setTimeout(poll, 250);
+  };
+  poll();
+}
+// Clear PID_FILE only if it names `pid` (avoid racing a freshly-started instance).
+function clearOwnPidFileFor(pid) {
+  try { if (readPidFile() === pid) fs.unlinkSync(PID_FILE); } catch {}
 }
 
 // ── Setup wizard ──────────────────────────────────────────────────────────────

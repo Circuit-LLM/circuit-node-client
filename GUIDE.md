@@ -106,6 +106,7 @@ Open `http://localhost:19000` in your browser.
 
 ```bash
 node node-client.js start              # Start the node (default)
+node node-client.js stop               # Stop the running node (graceful; add --force for SIGKILL)
 node node-client.js setup              # Interactive setup wizard (region, port, agent pairing)
 node node-client.js status             # Check node + network status
 node node-client.js update             # Check for and apply updates

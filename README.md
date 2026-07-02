@@ -184,6 +184,7 @@ If you skip this step, the node auto-creates `client.json` from the example on f
 
 ```bash
 node node-client.js                    # Start the node (default)
+node node-client.js stop               # Stop the running node (graceful; add --force for SIGKILL)
 node node-client.js setup              # Interactive setup wizard (region, port, agent pairing)
 node node-client.js status             # Check node + network status
 node node-client.js update             # Check GitHub for updates and apply
