@@ -2056,7 +2056,17 @@ let _walletProvider = null;
 async function connectStakeWallet() {
   const provider = window.phantom?.solana || window.solana || window.solflare;
   if (!provider) {
-    alert('No Solana wallet detected.\n\nInstall Phantom (phantom.app) or Solflare (solflare.com) to connect your wallet.');
+    // No injected wallet — normal inside the desktop app (browser extensions can't inject into an
+    // app webview). Connecting only reads your address to show your stake, so point at the paste
+    // field right below instead of a dead "install Phantom" alert. (Staking itself is a browser
+    // action — the Manage stake link opens stakepoint.app, where Phantom works.)
+    const inp = document.getElementById('stake-manual-input');
+    if (inp) {
+      inp.focus();
+      inp.scrollIntoView({ block: 'nearest' });
+      inp.style.borderColor = '#dcb820';
+      inp.placeholder = 'Paste your Solana address here — no extension needed';
+    }
     return;
   }
   try {
