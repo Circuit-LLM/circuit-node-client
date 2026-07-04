@@ -66,6 +66,16 @@ const exe       = isWin ? '.exe' : '';
 mkdirSync(BIN_DIR, { recursive: true });
 const outBin = path.join(BIN_DIR, `circuit-node-${triple}${exe}`);
 requireTool('bun', 'Bun', BUN_HINT);
+
+// The compile bundles node-client's runtime deps (express/qrcode/ws), so they must be present in the
+// repo root. In CI only desktop/ installs its own deps, so the root node_modules is absent and bun
+// fails with "Could not resolve: express". Install the root deps when missing (self-heals dev + CI).
+if (!existsSync(path.join(REPO, 'node_modules', 'express'))) {
+  console.log('[sidecar] installing node-client runtime deps (root node_modules missing)…');
+  const hasLock = existsSync(path.join(REPO, 'package-lock.json'));
+  execFileSync('npm', hasLock ? ['ci', '--omit=dev'] : ['install', '--omit=dev'], { cwd: REPO, stdio: 'inherit' });
+}
+
 console.log(`[sidecar] bun compile → ${path.relative(REPO, outBin)}`);
 // --target lets a CI runner cross-compile the bun binary for the release triple.
 const bunTarget = bunTargetFor(triple);
