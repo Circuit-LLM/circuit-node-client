@@ -54,7 +54,9 @@ async function afterUp() {
   try { NODE = await invoke('node_info_cmd'); } catch {}
   try { SETUP = (await get('/setup/status')).body; } catch { SETUP = {}; }
   wireStatic();
-  if (SETUP?.cpu?.connected || SETUP?.gpu?.connected) showMain(); else openPicker();
+  // Always land on the node dashboard (its default tab is Overview). The mode picker is a
+  // deliberate "Contribute" screen reached from the top bar, not the app's landing page.
+  showMain();
   checkUpdate();
 }
 

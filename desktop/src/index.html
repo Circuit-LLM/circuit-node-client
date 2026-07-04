@@ -15,33 +15,52 @@
     <div class="boot-bar"><span></span></div>
   </section>
 
-  <!-- First-run welcome / mode picker -->
+  <!-- Contribute screen — reached from the top bar's Contribute button -->
   <section id="picker" class="view" hidden>
-    <header class="picker-head">
-      <div class="mark sm" aria-hidden="true">◉</div>
-      <h1>Power the Circuit network</h1>
-      <p>Two ways to contribute from this machine. Pick one to start — or skip straight to your node dashboard.</p>
-    </header>
-    <div class="modes">
-      <button class="mode-card cpu" data-mode="cpu">
-        <div class="mode-tag">Any computer · low barrier</div>
-        <div class="mode-ico">🖧</div>
-        <h2>CPU · Agent cloud</h2>
-        <p>Lend spare CPU to <b>run agents for the Circuit cloud</b> under a budget you set. No GPU, no Docker, no setup. Keys stay off your box.</p>
-        <div class="mode-go">Set a budget &amp; go →</div>
-      </button>
-      <button class="mode-card gpu" data-mode="gpu">
-        <div class="mode-tag">NVIDIA GPU · high value</div>
-        <div class="mode-ico">⚡</div>
-        <h2>GPU · Inference mesh</h2>
-        <p>Your GPU holds a <b>slice of the decentralized model</b> and serves inference. Heavier setup, bigger share. Needs an NVIDIA GPU.</p>
-        <div class="mode-go">Check my GPU →</div>
-      </button>
+    <div class="picker-inner">
+      <header class="picker-head">
+        <div class="mark sm" aria-hidden="true">◉</div>
+        <h1>Power the Circuit network</h1>
+        <p>Two ways to contribute from this machine — lend spare CPU to host agents, or an NVIDIA GPU to serve inference.</p>
+      </header>
+      <div class="modes">
+        <button class="mode-card cpu" data-mode="cpu">
+          <div class="mode-top">
+            <span class="mode-tag">Any computer · low barrier</span>
+            <span class="mode-ico" aria-hidden="true">
+              <svg viewBox="0 0 34 34" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                <circle cx="17" cy="17" r="3.6" />
+                <circle cx="6" cy="7" r="2.4" /><circle cx="28" cy="7" r="2.4" />
+                <circle cx="6" cy="27" r="2.4" /><circle cx="28" cy="27" r="2.4" />
+                <path d="M13.7 14.3 8.4 9M20.3 14.3 25.6 9M13.7 19.7 8.4 25M20.3 19.7 25.6 25" />
+              </svg>
+            </span>
+          </div>
+          <h2>CPU · Agent cloud</h2>
+          <p>Lend spare CPU to <b>run agents for the Circuit cloud</b> under a budget you set. No GPU, no Docker, no setup. Keys stay off your box.</p>
+          <div class="mode-go">Set a budget &amp; go →</div>
+        </button>
+        <button class="mode-card gpu" data-mode="gpu">
+          <div class="mode-top">
+            <span class="mode-tag">NVIDIA GPU · high value</span>
+            <span class="mode-ico" aria-hidden="true">
+              <svg viewBox="0 0 34 34" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round">
+                <rect x="6" y="6.5" width="22" height="5.4" rx="1.6" />
+                <rect x="6" y="14.3" width="22" height="5.4" rx="1.6" fill="currentColor" />
+                <rect x="6" y="22.1" width="22" height="5.4" rx="1.6" />
+              </svg>
+            </span>
+          </div>
+          <h2>GPU · Inference mesh</h2>
+          <p>Your GPU holds a <b>slice of the decentralized model</b> and serves inference. Heavier setup, bigger share. Needs an NVIDIA GPU.</p>
+          <div class="mode-go">Check my GPU →</div>
+        </button>
+      </div>
+      <footer class="picker-foot">
+        <button class="link" id="skip-to-dash">← Back to dashboard</button>
+        <span id="picker-node" class="muted mono"></span>
+      </footer>
     </div>
-    <footer class="picker-foot">
-      <span id="picker-node" class="muted mono"></span>
-      <button class="link" id="skip-to-dash">Skip — open the node dashboard →</button>
-    </footer>
   </section>
 
   <!-- Main view: native top bar + the node's full dashboard, embedded -->
