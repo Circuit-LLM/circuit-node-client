@@ -28,8 +28,24 @@ const REPO       = path.resolve(DESKTOP, '..');
 const BIN_DIR    = path.join(DESKTOP, 'src-tauri', 'binaries');
 const ASSET_DIR  = path.join(DESKTOP, 'src-tauri', 'resources', 'node-client-assets');
 
+// Fail with a clear, actionable message when a required build tool is missing, instead of a raw
+// `spawnSync <tool> ENOENT` stack trace. The compile needs bun; a host build also needs rustc.
+function requireTool(cmd, name, hint) {
+  try {
+    execFileSync(cmd, ['--version'], { stdio: 'ignore' });
+  } catch {
+    console.error(`\n[sidecar] ${name} ("${cmd}") was not found on your PATH — it is required to build the desktop app.`);
+    console.error(`[sidecar] Install it:  ${hint}`);
+    console.error('[sidecar] Then REOPEN your terminal (so PATH refreshes) and run the build again.\n');
+    process.exit(1);
+  }
+}
+
+const BUN_HINT = 'https://bun.sh  —  Windows: powershell -c "irm bun.sh/install.ps1 | iex"  ·  macOS/Linux: curl -fsSL https://bun.sh/install | bash';
+
 // ── Resolve the Rust target triple (Tauri names sidecars <name>-<triple>) ──────
 function hostTriple() {
+  requireTool('rustc', 'Rust (rustc)', 'https://rustup.rs');
   const out = execFileSync('rustc', ['-vV'], { encoding: 'utf8' });
   const m = out.match(/host:\s*(\S+)/);
   if (!m) throw new Error('could not read host triple from `rustc -vV`');
@@ -49,6 +65,7 @@ const exe       = isWin ? '.exe' : '';
 // ── 1. Compile the sidecar binary ──────────────────────────────────────────────
 mkdirSync(BIN_DIR, { recursive: true });
 const outBin = path.join(BIN_DIR, `circuit-node-${triple}${exe}`);
+requireTool('bun', 'Bun', BUN_HINT);
 console.log(`[sidecar] bun compile → ${path.relative(REPO, outBin)}`);
 // --target lets a CI runner cross-compile the bun binary for the release triple.
 const bunTarget = bunTargetFor(triple);

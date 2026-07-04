@@ -45,15 +45,29 @@ this is an additional, friendlier front door to the identical node.
 
 ## Build
 
-Prereqs: **Rust** (stable), **Node 22+**, **bun**, and the Tauri system deps for your OS
-(<https://tauri.app/start/prerequisites/>). On Debian/Ubuntu:
+> **End users don't build this** — they download a signed installer from the releases page.
+> Building from source is for developers and needs the full toolchain below.
 
-```bash
-sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
-  libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
-```
+**Prerequisites (all platforms):** [**Rust**](https://rustup.rs) (stable), **Node 20+**, and
+[**bun**](https://bun.sh) (the sidecar is bun-compiled — Node alone is not enough). Plus the
+[Tauri system deps](https://tauri.app/start/prerequisites/) for your OS:
 
-Then:
+- **Windows:** [Rust](https://rustup.rs) + **Visual Studio C++ Build Tools** ("Desktop development
+  with C++" workload) + WebView2 (preinstalled on Win 10/11). Install bun with:
+  ```powershell
+  powershell -c "irm bun.sh/install.ps1 | iex"
+  ```
+  Then **reopen the terminal** so `bun` is on your PATH.
+- **macOS:** Xcode Command Line Tools (`xcode-select --install`); `curl -fsSL https://bun.sh/install | bash`.
+- **Debian/Ubuntu:**
+  ```bash
+  sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+    libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+  curl -fsSL https://bun.sh/install | bash
+  ```
+
+If a required tool is missing, the sidecar build stops with a clear message telling you which one
+and how to install it. Then:
 
 ```bash
 cd desktop
