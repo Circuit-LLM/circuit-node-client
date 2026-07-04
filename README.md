@@ -52,7 +52,8 @@ Prefer a click to a terminal? The **Circuit Node desktop app** (in [`desktop/`](
 
 It is **additive, not a replacement.** The app runs the same `node-client` and registers the same way, so a node is identical to the network however it was installed — and **every command below keeps working exactly as it does today.** You can install with the app and still drive it from the CLI, or vice-versa.
 
-- **Install:** signed installers are published per release (macOS `.dmg`, Windows `.exe`/`.msi`, Linux `.AppImage`/`.deb`).
+- **Download:** grab the installer for your OS from the [**latest release**](https://github.com/Circuit-LLM/circuit-node-client/releases/latest) — Windows `.exe`/`.msi`, macOS (Apple Silicon) `.dmg`, Linux `.deb`.
+  > The installers are currently **unsigned**, so Windows SmartScreen and macOS Gatekeeper warn about an unknown developer. On Windows: *More info → Run anyway*. On macOS: right-click the app → *Open*. Code-signing (which removes the warning) comes later.
 - **Build from source** (Rust + Node + bun): see [`desktop/README.md`](desktop/README.md).
 
 Under the hood the app runs the client as a self-contained sidecar, keeping its config and data in a per-user directory via `CIRCUIT_NODE_HOME` (unset on a normal CLI install, so nothing changes for terminal users).

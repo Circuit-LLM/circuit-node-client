@@ -87,18 +87,22 @@ npm run icons    # rsvg-convert → source.png → tauri icon
 
 ## Distribution & signing
 
-Each OS must build on its own runner (the sidecar is compiled per-platform). See
+Each OS builds on its own runner (the sidecar is compiled per-platform). Pushing a `desktop-v*`
+tag builds all targets and attaches the installers to a public GitHub Release. See
 `.github/workflows/desktop-build.yml`. Outputs:
 
-| OS      | Installer            | Signing (required for public release)             |
-|---------|----------------------|---------------------------------------------------|
-| macOS   | `.dmg` (universal)   | Apple Developer ID + notarization                 |
-| Windows | `.msi` / `-setup.exe`| Authenticode (EV cert avoids SmartScreen)         |
-| Linux   | `.AppImage` / `.deb` | detached GPG (optional)                            |
+| OS                    | Installer            | Signing (to remove the warning)             |
+|-----------------------|----------------------|---------------------------------------------|
+| macOS (Apple Silicon) | `.dmg`               | Apple Developer ID + notarization           |
+| macOS (Intel)         | `.dmg`               | " (Intel runners queue slowly on CI)        |
+| Windows               | `.msi` / `-setup.exe`| Authenticode (EV cert avoids SmartScreen)   |
+| Linux                 | `.deb`               | detached GPG (optional)                     |
 
-Signing is wired through CI secrets (`APPLE_*`, `WINDOWS_CERTIFICATE*`). Unset → unsigned
-artifacts, which is fine for internal testing but trips "unidentified developer" on users'
-machines. **Budget the certs before a public release** (Apple $99/yr; Windows EV ~$200–400/yr).
+**AppImage** is intentionally omitted for now — its linuxdeploy/gtk bundling is flaky on CI; ship
+`.deb` and revisit later. Builds are **unsigned** until certs are added: the CI signing env is off
+(empty secrets make Tauri fail importing a nonexistent cert), so installers run but warn
+"unidentified developer". To sign, add the `APPLE_*` / `WINDOWS_CERTIFICATE*` secrets and restore
+the signing `env:` block in the workflow (Apple ~$99/yr; Windows EV ~$200–400/yr).
 
 ## What needs a real machine (not buildable from a Linux box)
 
