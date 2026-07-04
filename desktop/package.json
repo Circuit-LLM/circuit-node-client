@@ -1,7 +1,7 @@
 {
   "name": "circuit-node-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CIRCUIT Node — native desktop app (GPU inference mesh + CPU agent cloud)",
   "scripts": {
     "sidecar": "node scripts/build-sidecar.mjs",

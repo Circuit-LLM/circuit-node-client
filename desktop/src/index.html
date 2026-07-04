@@ -15,19 +15,19 @@
     <div class="boot-bar"><span></span></div>
   </section>
 
-  <!-- Mode picker — first run, neither contribution connected -->
+  <!-- First-run welcome / mode picker -->
   <section id="picker" class="view" hidden>
     <header class="picker-head">
       <div class="mark sm" aria-hidden="true">◉</div>
       <h1>Power the Circuit network</h1>
-      <p>Two ways to contribute from this machine. You can run either — or both. Pick where to start; you can add the other any time.</p>
+      <p>Two ways to contribute from this machine. Pick one to start — or skip straight to your node dashboard.</p>
     </header>
     <div class="modes">
       <button class="mode-card cpu" data-mode="cpu">
         <div class="mode-tag">Any computer · low barrier</div>
         <div class="mode-ico">🖧</div>
         <h2>CPU · Agent cloud</h2>
-        <p>Lend spare CPU to <b>run agents for the Circuit cloud</b> under a budget you set. No GPU, no Docker, no setup — the host is built in. Keys stay off your box.</p>
+        <p>Lend spare CPU to <b>run agents for the Circuit cloud</b> under a budget you set. No GPU, no Docker, no setup. Keys stay off your box.</p>
         <div class="mode-go">Set a budget &amp; go →</div>
       </button>
       <button class="mode-card gpu" data-mode="gpu">
@@ -40,58 +40,23 @@
     </div>
     <footer class="picker-foot">
       <span id="picker-node" class="muted mono"></span>
-      <button class="link" data-open-web>Open the full web dashboard</button>
+      <button class="link" id="skip-to-dash">Skip — open the node dashboard →</button>
     </footer>
   </section>
 
-  <!-- Main dashboard -->
-  <section id="dash" class="view" hidden>
+  <!-- Main view: native top bar + the node's full dashboard, embedded -->
+  <section id="main" class="view" hidden>
     <header class="topbar">
       <div class="brand"><span class="mark sm" aria-hidden="true">◉</span> Circuit Node</div>
       <div class="topbar-right">
-        <span id="net-pill" class="pill">network</span>
-        <span id="node-pill" class="pill">node</span>
+        <span id="net-pill" class="pill">node</span>
+        <button id="contribute-btn" class="btn sm">Contribute</button>
+        <button id="update-btn" class="btn sm" hidden>Update</button>
+        <button id="ext-btn" class="icon-btn" title="Open in browser">↗</button>
         <button id="theme-btn" class="icon-btn" title="Toggle theme">◐</button>
       </div>
     </header>
-
-    <div id="update-banner" class="banner" hidden>
-      <span id="update-text"></span>
-      <button id="update-btn" class="btn sm">Download update</button>
-      <button id="update-dismiss" class="link sm">Later</button>
-    </div>
-
-    <main class="grid">
-      <!-- Contribution: CPU agent cloud -->
-      <div class="card" id="card-cpu">
-        <div class="card-head"><h3>🖧 CPU · Agent cloud</h3><span class="chip" id="cpu-chip">—</span></div>
-        <div class="card-body" id="cpu-body"></div>
-      </div>
-
-      <!-- Contribution: GPU inference -->
-      <div class="card" id="card-gpu">
-        <div class="card-head"><h3>⚡ GPU · Inference mesh</h3><span class="chip" id="gpu-chip">—</span></div>
-        <div class="card-body" id="gpu-body"></div>
-      </div>
-
-      <!-- Earnings -->
-      <div class="card" id="card-earn">
-        <div class="card-head"><h3>Earnings</h3><span class="chip" id="earn-chip">CIRC</span></div>
-        <div class="card-body" id="earn-body"></div>
-      </div>
-
-      <!-- Network / mesh -->
-      <div class="card" id="card-net">
-        <div class="card-head"><h3>Network</h3><span class="chip" id="netcard-chip">—</span></div>
-        <div class="card-body" id="net-body"></div>
-      </div>
-
-      <!-- Settings -->
-      <div class="card wide" id="card-set">
-        <div class="card-head"><h3>Settings</h3></div>
-        <div class="card-body" id="set-body"></div>
-      </div>
-    </main>
+    <iframe id="dashframe" title="Node dashboard" referrerpolicy="no-referrer"></iframe>
   </section>
 
   <!-- Modal host for connect wizards -->
