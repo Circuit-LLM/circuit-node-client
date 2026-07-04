@@ -29,7 +29,6 @@
   },
   "bundle": {
     "active": true,
-    "_targetsNote": "AppImage is omitted: its linuxdeploy/gtk bundling is flaky on CI and headless boxes, and it aborts the whole Linux job (losing the good .deb). Ship .deb for Linux; revisit AppImage later. Tauri builds only the targets applicable per OS (deb=Linux, app+dmg=macOS, nsis+msi=Windows).",
     "targets": ["deb", "app", "dmg", "nsis", "msi"],
     "category": "Utility",
     "shortDescription": "Run a Circuit node — GPU inference or CPU agent hosting.",
