@@ -37,3 +37,7 @@ data/identity-worker*.json
 
 # local dashboard safety backups
 *.bak
+
+# bun lockfile (this repo uses npm; bun is only used to compile the sidecar)
+bun.lockb
+bun.lock

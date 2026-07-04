@@ -72,8 +72,9 @@ requireTool('bun', 'Bun', BUN_HINT);
 // fails with "Could not resolve: express". Install the root deps when missing (self-heals dev + CI).
 if (!existsSync(path.join(REPO, 'node_modules', 'express'))) {
   console.log('[sidecar] installing node-client runtime deps (root node_modules missing)…');
-  const hasLock = existsSync(path.join(REPO, 'package-lock.json'));
-  execFileSync('npm', hasLock ? ['ci', '--omit=dev'] : ['install', '--omit=dev'], { cwd: REPO, stdio: 'inherit' });
+  // Use bun (not npm): bun's binary resolves via execFileSync on every OS, whereas npm is npm.cmd on
+  // Windows and fails with spawnSync ENOENT. bun install reads package.json → installs express/qrcode/ws.
+  execFileSync('bun', ['install'], { cwd: REPO, stdio: 'inherit' });
 }
 
 console.log(`[sidecar] bun compile → ${path.relative(REPO, outBin)}`);
