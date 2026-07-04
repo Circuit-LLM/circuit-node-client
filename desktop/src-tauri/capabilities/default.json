@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capabilities for the main window. Node/GPU/CPU control, notifications, autostart and external links are all driven from the Rust host, so the webview only needs core IPC plus a couple of plugin defaults it touches directly.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default"
+  ]
+}

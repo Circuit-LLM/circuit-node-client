@@ -1,0 +1,81 @@
+# Build the Circuit Node desktop app for macOS, Windows, and Linux.
+#
+# Triggers: any push of a tag like `desktop-v0.1.0`, or manually. Each runner builds its own
+# native installer (the sidecar is bun-compiled per-OS, so builds must be native — no cross).
+# Signing is wired through secrets; unset secrets just produce unsigned artifacts (fine for CI,
+# NOT for public distribution — see desktop/README.md).
+name: desktop-build
+
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest      # Apple Silicon .dmg
+            target: aarch64-apple-darwin
+          - os: macos-13          # Intel .dmg (macos-13 runner is x86_64)
+            target: x86_64-apple-darwin
+          - os: ubuntu-22.04      # .AppImage + .deb
+            target: ""
+          - os: windows-latest    # .msi + nsis .exe
+            target: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build deps
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+
+      - uses: oven-sh/setup-bun@v2       # bun compiles the node-client sidecar
+        with: { bun-version: latest }
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: swatinem/rust-cache@v2
+        with: { workspaces: "./desktop/src-tauri -> target" }
+
+      - name: Install desktop deps
+        working-directory: desktop
+        run: npm ci
+
+      - name: Build app
+        working-directory: desktop
+        run: npm run tauri -- build ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+        env:
+          # ── macOS signing + notarization (leave unset → unsigned build) ──
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # ── Windows Authenticode (leave unset → unsigned build) ──
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: circuit-node-${{ matrix.os }}
+          path: |
+            desktop/src-tauri/target/**/release/bundle/**/*.dmg
+            desktop/src-tauri/target/**/release/bundle/**/*.AppImage
+            desktop/src-tauri/target/**/release/bundle/**/*.deb
+            desktop/src-tauri/target/**/release/bundle/**/*.msi
+            desktop/src-tauri/target/**/release/bundle/**/*-setup.exe
+          if-no-files-found: warn

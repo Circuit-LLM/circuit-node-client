@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="42%" r="60%">
+      <stop offset="0%" stop-color="#241a06"/>
+      <stop offset="100%" stop-color="#0f0b06"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f2d766"/>
+      <stop offset="100%" stop-color="#dcb820"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="228" fill="url(#glow)"/>
+  <rect x="6" y="6" width="1012" height="1012" rx="224" fill="none" stroke="#2c2410" stroke-width="12"/>
+  <g fill="none" stroke="url(#gold)" stroke-linecap="round">
+    <!-- outer reticle ring -->
+    <circle cx="512" cy="512" r="266" stroke-width="26"/>
+    <!-- inner ring -->
+    <circle cx="512" cy="512" r="150" stroke-width="18" opacity="0.55"/>
+    <!-- crosshair ticks -->
+    <g stroke-width="26">
+      <line x1="512" y1="150" x2="512" y2="232"/>
+      <line x1="512" y1="792" x2="512" y2="874"/>
+      <line x1="150" y1="512" x2="232" y2="512"/>
+      <line x1="792" y1="512" x2="874" y2="512"/>
+    </g>
+  </g>
+  <!-- signal core -->
+  <circle cx="512" cy="512" r="76" fill="url(#gold)"/>
+</svg>

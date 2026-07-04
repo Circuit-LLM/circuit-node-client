@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Circuit Node</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <!-- Boot splash — shown while the node sidecar comes up -->
+  <section id="boot" class="view boot">
+    <div class="mark" aria-hidden="true">◉</div>
+    <div class="boot-title">CIRCUIT NODE</div>
+    <div class="boot-sub" id="boot-status">starting your node…</div>
+    <div class="boot-bar"><span></span></div>
+  </section>
+
+  <!-- Mode picker — first run, neither contribution connected -->
+  <section id="picker" class="view" hidden>
+    <header class="picker-head">
+      <div class="mark sm" aria-hidden="true">◉</div>
+      <h1>Power the Circuit network</h1>
+      <p>Two ways to contribute from this machine. You can run either — or both. Pick where to start; you can add the other any time.</p>
+    </header>
+    <div class="modes">
+      <button class="mode-card cpu" data-mode="cpu">
+        <div class="mode-tag">Any computer · low barrier</div>
+        <div class="mode-ico">🖧</div>
+        <h2>CPU · Agent cloud</h2>
+        <p>Lend spare CPU to <b>run agents for the Circuit cloud</b> under a budget you set. No GPU, no Docker, no setup — the host is built in. Keys stay off your box.</p>
+        <div class="mode-go">Set a budget &amp; go →</div>
+      </button>
+      <button class="mode-card gpu" data-mode="gpu">
+        <div class="mode-tag">NVIDIA GPU · high value</div>
+        <div class="mode-ico">⚡</div>
+        <h2>GPU · Inference mesh</h2>
+        <p>Your GPU holds a <b>slice of the decentralized model</b> and serves inference. Heavier setup, bigger share. Needs an NVIDIA GPU.</p>
+        <div class="mode-go">Check my GPU →</div>
+      </button>
+    </div>
+    <footer class="picker-foot">
+      <span id="picker-node" class="muted mono"></span>
+      <button class="link" data-open-web>Open the full web dashboard</button>
+    </footer>
+  </section>
+
+  <!-- Main dashboard -->
+  <section id="dash" class="view" hidden>
+    <header class="topbar">
+      <div class="brand"><span class="mark sm" aria-hidden="true">◉</span> Circuit Node</div>
+      <div class="topbar-right">
+        <span id="net-pill" class="pill">network</span>
+        <span id="node-pill" class="pill">node</span>
+        <button id="theme-btn" class="icon-btn" title="Toggle theme">◐</button>
+      </div>
+    </header>
+
+    <div id="update-banner" class="banner" hidden>
+      <span id="update-text"></span>
+      <button id="update-btn" class="btn sm">Download update</button>
+      <button id="update-dismiss" class="link sm">Later</button>
+    </div>
+
+    <main class="grid">
+      <!-- Contribution: CPU agent cloud -->
+      <div class="card" id="card-cpu">
+        <div class="card-head"><h3>🖧 CPU · Agent cloud</h3><span class="chip" id="cpu-chip">—</span></div>
+        <div class="card-body" id="cpu-body"></div>
+      </div>
+
+      <!-- Contribution: GPU inference -->
+      <div class="card" id="card-gpu">
+        <div class="card-head"><h3>⚡ GPU · Inference mesh</h3><span class="chip" id="gpu-chip">—</span></div>
+        <div class="card-body" id="gpu-body"></div>
+      </div>
+
+      <!-- Earnings -->
+      <div class="card" id="card-earn">
+        <div class="card-head"><h3>Earnings</h3><span class="chip" id="earn-chip">CIRC</span></div>
+        <div class="card-body" id="earn-body"></div>
+      </div>
+
+      <!-- Network / mesh -->
+      <div class="card" id="card-net">
+        <div class="card-head"><h3>Network</h3><span class="chip" id="netcard-chip">—</span></div>
+        <div class="card-body" id="net-body"></div>
+      </div>
+
+      <!-- Settings -->
+      <div class="card wide" id="card-set">
+        <div class="card-head"><h3>Settings</h3></div>
+        <div class="card-body" id="set-body"></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- Modal host for connect wizards -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <button class="modal-x" id="modal-x" aria-label="Close">✕</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

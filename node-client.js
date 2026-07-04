@@ -30,6 +30,9 @@ process.stderr.on('error', err => { if (err.code !== 'EPIPE') throw err; });
 const fs      = require('fs');
 const path    = require('path');
 
+const home     = require('./lib/home');
+home.ensureDirs();   // create config/ + data/ when CIRCUIT_NODE_HOME relocates them (app install)
+
 const identity   = require('./lib/identity');
 const registry   = require('./lib/registry');
 const sync       = require('./lib/sync');
@@ -39,11 +42,13 @@ const circuitAgent = require('./lib/circuit-agent');
 const llmWorker  = require('./lib/llm-worker');
 const { computeAssignment } = require('./lib/shard');
 
-const CONFIG_FILE  = path.join(__dirname, 'config', 'client.json');
-const EXAMPLE_FILE = path.join(__dirname, 'config', 'client.example.json');
+// Writable config/data resolve via lib/home (CIRCUIT_NODE_HOME override for the desktop app;
+// defaults to this directory for the CLI). The example template ships with the code.
+const CONFIG_FILE  = path.join(home.CONFIG_DIR, 'client.json');
+const EXAMPLE_FILE = path.join(home.INSTALL_ROOT, 'config', 'client.example.json');
 // PID file — lets `node node-client.js stop` find and signal a running node without
 // hunting for the process id. Written on start (runNode), removed on clean exit.
-const PID_FILE     = path.join(__dirname, 'data', 'node.pid');
+const PID_FILE     = path.join(home.DATA_DIR, 'node.pid');
 
 // True if a process with this pid is currently alive (signal 0 = liveness probe, no-op).
 function pidAlive(pid) {
@@ -172,6 +177,10 @@ if (command === 'setup') {
   runUpdate();
 } else if (command === 'rollback') {
   runRollback(process.argv[3]);
+} else if (command === 'host') {
+  runHost();
+} else if (command === 'agentd') {
+  runAgentd();
 } else if (command === 'start' || !command) {
   runNode();
 } else {
@@ -350,6 +359,21 @@ async function runStop() {
 // Clear PID_FILE only if it names `pid` (avoid racing a freshly-started instance).
 function clearOwnPidFileFor(pid) {
   try { if (readPidFile() === pid) fs.unlinkSync(PID_FILE); } catch {}
+}
+
+// ── Agent-cloud roles ───────────────────────────────────────────────────────
+// The node-host + reference workload are vendored in (vendor/agent-cloud/) so the SINGLE
+// bun-compiled sidecar can run every role by argv — no separate Node runtime on the user's
+// machine. `host` supervises hosted agents (SANDBOX=node, first-party/trusted, no Docker, the
+// same model as the production deployment); `agentd` is the built-in workload the host re-execs
+// per agent (CIRCUIT_SELF_EXEC). Both are ESM, loaded via dynamic import from this CJS entry.
+function runHost() {
+  import('./vendor/agent-cloud/node-host/host.js')
+    .catch(err => { console.error('[node-client] node-host role failed to start:', err); process.exit(1); });
+}
+function runAgentd() {
+  import('./vendor/agent-cloud/agentd/agentd.js')
+    .catch(err => { console.error('[node-client] agentd workload failed to start:', err); process.exit(1); });
 }
 
 // ── Setup wizard ──────────────────────────────────────────────────────────────
@@ -578,7 +602,7 @@ async function runRollback(targetVersion) {
     // Show available backups
     const fs   = require('fs');
     const path = require('path');
-    const backupsDir = path.join(__dirname, 'data', 'backups');
+    const backupsDir = path.join(home.DATA_DIR, 'backups');
     if (!fs.existsSync(backupsDir)) {
       console.error('No backups found.');
       process.exit(1);

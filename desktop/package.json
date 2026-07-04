@@ -1,0 +1,16 @@
+{
+  "name": "circuit-node-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "CIRCUIT Node — native desktop app (GPU inference mesh + CPU agent cloud)",
+  "scripts": {
+    "sidecar": "node scripts/build-sidecar.mjs",
+    "icons": "rsvg-convert -w 1024 -h 1024 icons/source.svg -o icons/source.png && tauri icon icons/source.png",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

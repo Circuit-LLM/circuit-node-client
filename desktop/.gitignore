@@ -1,0 +1,12 @@
+# Node / Tauri build artifacts
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+
+# Generated at build time by scripts/build-sidecar.mjs — never commit (large, per-platform)
+src-tauri/binaries/*
+!src-tauri/binaries/.gitkeep
+src-tauri/resources/node-client-assets/
+
+# Intermediate icon raster (regenerated from source.svg); the generated icon set IS committed
+icons/source.png
