@@ -15,7 +15,7 @@
 
 ---
 
-**[What it does](#what-it-does)** · **[Quick Start](#quick-start)** · **[Dashboard](#dashboard)** · **[Inference](#decentralized-llm-inference)** · **[CLI](#cli-commands)** · **[Config](#configuration)** · **[CIRC Staking](#circ-staking)** · **[Security](#security)**
+**[What it does](#what-it-does)** · **[Quick Start](#quick-start)** · **[Desktop app](#desktop-app)** · **[Dashboard](#dashboard)** · **[Inference](#decentralized-llm-inference)** · **[CLI](#cli-commands)** · **[Config](#configuration)** · **[CIRC Staking](#circ-staking)** · **[Security](#security)**
 
 ---
 
@@ -43,6 +43,19 @@ Open the dashboard at **`http://localhost:19000`**
 On first run the node generates a permanent ed25519 keypair, announces itself to the CIRCUIT registry, and starts sending heartbeats every 60 seconds.
 
 > **Back up `data/identity.json`** — it's your node's permanent identity on the network. Deleting it means re-registering as a new node.
+
+---
+
+## Desktop app
+
+Prefer a click to a terminal? The **Circuit Node desktop app** (in [`desktop/`](desktop/)) wraps this exact client in a native window — a system-tray background service with a setup wizard, live dashboards, OS notifications, launch-on-login, and one-button updates, for both ways to contribute (CPU agent hosting and GPU inference).
+
+It is **additive, not a replacement.** The app runs the same `node-client` and registers the same way, so a node is identical to the network however it was installed — and **every command below keeps working exactly as it does today.** You can install with the app and still drive it from the CLI, or vice-versa.
+
+- **Install:** signed installers are published per release (macOS `.dmg`, Windows `.exe`/`.msi`, Linux `.AppImage`/`.deb`).
+- **Build from source** (Rust + Node + bun): see [`desktop/README.md`](desktop/README.md).
+
+Under the hood the app runs the client as a self-contained sidecar, keeping its config and data in a per-user directory via `CIRCUIT_NODE_HOME` (unset on a normal CLI install, so nothing changes for terminal users).
 
 ---
 

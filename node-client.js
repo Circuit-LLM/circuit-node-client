@@ -7,6 +7,10 @@
 //   node node-client.js status    — print current node status
 //   node node-client.js deregister — remove from network and exit
 //
+//   Internal roles (invoked by the desktop app re-execing this binary — not typed by hand):
+//   node node-client.js host      — run the agent-cloud node-host (CPU agent hosting)
+//   node node-client.js agentd    — run the built-in reference workload
+//
 // What this does:
 //   1. Loads or generates node identity (ed25519 keypair)
 //   2. Announces to the CIRCUIT network registry
