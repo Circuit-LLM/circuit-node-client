@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="150" height="57" viewBox="0 0 150 57">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f2d766"/>
+      <stop offset="100%" stop-color="#dcb820"/>
+    </linearGradient>
+  </defs>
+  <rect width="150" height="57" fill="#0f0b06"/>
+  <rect x="0" y="55" width="150" height="2" fill="#2c2410"/>
+  <!-- glyph -->
+  <g transform="translate(28,28)" fill="none" stroke="url(#gold)" stroke-linecap="round">
+    <circle r="16" stroke-width="2.4"/>
+    <g stroke-width="2.4">
+      <line x1="0" y1="-22" x2="0" y2="-18"/>
+      <line x1="0" y1="18" x2="0" y2="22"/>
+      <line x1="-22" y1="0" x2="-18" y2="0"/>
+      <line x1="18" y1="0" x2="22" y2="0"/>
+    </g>
+  </g>
+  <circle cx="28" cy="28" r="5.5" fill="url(#gold)"/>
+  <!-- wordmark -->
+  <text x="52" y="27" fill="#f2d766" font-family="'DejaVu Sans','Helvetica',sans-serif" font-size="13" font-weight="700" letter-spacing="1.5">CIRCUIT</text>
+  <text x="52" y="43" fill="#9c8f5e" font-family="'DejaVu Sans Mono','Courier New',monospace" font-size="9" letter-spacing="4">NODE</text>
+</svg>

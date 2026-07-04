@@ -1,6 +1,6 @@
 [package]
 name = "circuit-node-desktop"
-version = "0.1.2"
+version = "0.1.3"
 description = "CIRCUIT Node — desktop app for the GPU inference mesh and CPU agent cloud"
 authors = ["Circuit LLM <circuitllm@protonmail.com>"]
 edition = "2021"

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="164" height="314" viewBox="0 0 164 314">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="34%" r="62%">
+      <stop offset="0%" stop-color="#241a06"/>
+      <stop offset="100%" stop-color="#0f0b06"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f2d766"/>
+      <stop offset="100%" stop-color="#dcb820"/>
+    </linearGradient>
+  </defs>
+  <rect width="164" height="314" fill="url(#glow)"/>
+  <!-- reticle glyph -->
+  <g transform="translate(82,108)" fill="none" stroke="url(#gold)" stroke-linecap="round">
+    <circle r="46" stroke-width="5"/>
+    <circle r="26" stroke-width="3.5" opacity="0.55"/>
+    <g stroke-width="5">
+      <line x1="0" y1="-62" x2="0" y2="-48"/>
+      <line x1="0" y1="48" x2="0" y2="62"/>
+      <line x1="-62" y1="0" x2="-48" y2="0"/>
+      <line x1="48" y1="0" x2="62" y2="0"/>
+    </g>
+  </g>
+  <circle cx="82" cy="108" r="13" fill="url(#gold)"/>
+  <!-- wordmark -->
+  <text x="82" y="212" text-anchor="middle" fill="#f2d766" font-family="'DejaVu Sans','Helvetica',sans-serif" font-size="20" font-weight="700" letter-spacing="3">CIRCUIT</text>
+  <text x="82" y="236" text-anchor="middle" fill="#9c8f5e" font-family="'DejaVu Sans Mono','Courier New',monospace" font-size="12" letter-spacing="7">NODE</text>
+  <rect x="52" y="252" width="60" height="2" rx="1" fill="#8a6f1c"/>
+  <text x="82" y="298" text-anchor="middle" fill="#675c33" font-family="'DejaVu Sans Mono',monospace" font-size="8" letter-spacing="1">circuitllm.xyz</text>
+</svg>
