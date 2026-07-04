@@ -360,6 +360,20 @@ fn open_url(app: AppHandle, url: String) -> Result<(), String> {
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
 
+// Native folder picker for pairing a local circuit-agent (its data dir). Returns the chosen path,
+// or None if the user cancelled. Runs off the main thread (command handler), which is what the
+// blocking dialog needs.
+#[tauri::command]
+fn pick_agent_dir(app: AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+    app.dialog()
+        .file()
+        .set_title("Select your circuit-agent data folder")
+        .blocking_pick_folder()
+        .and_then(|p| p.into_path().ok())
+        .map(|pb| pb.to_string_lossy().into_owned())
+}
+
 #[tauri::command]
 fn notify_cmd(app: AppHandle, title: String, body: String) {
     notify(&app, &title, &body);
@@ -434,6 +448,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--minimized"]),
@@ -444,6 +459,7 @@ pub fn run() {
             restart_node,
             check_app_update,
             open_url,
+            pick_agent_dir,
             notify_cmd,
             get_autostart,
             set_autostart,

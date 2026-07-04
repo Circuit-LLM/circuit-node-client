@@ -1,6 +1,6 @@
 [package]
 name = "circuit-node-desktop"
-version = "0.1.1"
+version = "0.1.2"
 description = "CIRCUIT Node — desktop app for the GPU inference mesh and CPU agent cloud"
 authors = ["Circuit LLM <circuitllm@protonmail.com>"]
 edition = "2021"
@@ -21,6 +21,7 @@ tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # reqwest talks to the local sidecar from the Rust side, so the webview never makes a

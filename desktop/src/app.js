@@ -30,7 +30,7 @@ function show(view) { ['boot', 'picker', 'main'].forEach(v => { const n = $('#' 
 
 // ── boot ────────────────────────────────────────────────────────────
 async function boot() {
-  applyTheme(store.get('theme', 'auto'));
+  applyTheme();
   try { NODE = await invoke('node_info_cmd'); } catch {}
   const status = $('#boot-status');
   for (let i = 0; i < 60; i++) {
@@ -182,12 +182,23 @@ function modal(html) { $('#modal-content').innerHTML = html; $('#modal').hidden 
 function closeModal() { $('#modal').hidden = true; }
 let toastTimer;
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2600); }
-function applyTheme(mode) {
-  const root = document.documentElement;
-  if (mode === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', mode);
-  store.set('theme', mode);
-  const btn = document.getElementById('theme-btn');
-  if (btn) { btn.textContent = mode === 'light' ? '☀' : mode === 'dark' ? '☾' : '◐'; btn.title = `Theme: ${mode}`; }
+// The embedded node dashboard is dark-only ("Signal Gold on Carbon"), so the whole app is pinned
+// dark to match — a light shell around a dark dashboard just looked broken. No toggle.
+function applyTheme() { document.documentElement.setAttribute('data-theme', 'dark'); }
+
+// ── Pair a local circuit-agent (enables the Agent + Chat tabs) ──────
+async function connectAgent() {
+  let dir;
+  try { dir = await invoke('pick_agent_dir'); } catch { toast('Folder picker unavailable'); return; }
+  if (!dir) return; // cancelled
+  toast('Pairing agent…');
+  const r = await post('/setup/agent', { dataPath: dir }).catch(() => ({ ok: false, body: {} }));
+  if (!(r.ok && r.body?.ok)) { toast(r.body?.error || 'That folder isn’t a circuit-agent data dir'); return; }
+  toast(r.body.agentFound ? 'Agent paired — restarting node…' : 'Paired (start circuit-agent to see it) — restarting…');
+  try { await invoke('restart_node'); } catch {}
+  // wait for the node to come back, then reload the embedded dashboard so Agent/Chat pick up the pairing
+  for (let i = 0; i < 30; i++) { try { if ((await get('/health')).ok) break; } catch {} await sleep(500); }
+  const f = $('#dashframe'); if (f) { const url = `http://localhost:${NODE.port}/`; f.setAttribute('src', 'about:blank'); setTimeout(() => f.setAttribute('src', url), 80); }
 }
 let _wired = false;
 function wireStatic() {
@@ -197,8 +208,8 @@ function wireStatic() {
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
   $('#skip-to-dash').onclick = showMain;
   $('#contribute-btn').onclick = openPicker;
+  $('#agent-btn').onclick = connectAgent;
   $('#ext-btn').onclick = () => invoke('open_url', { url: `http://localhost:${NODE.port}/` });
-  $('#theme-btn').onclick = () => { const cur = store.get('theme', 'auto'); const next = cur === 'auto' ? 'light' : cur === 'light' ? 'dark' : 'auto'; applyTheme(next); };
   listen('node-status', (e) => { if (e.payload && e.payload.running === false) { const p = $('#net-pill'); if (p) { p.textContent = 'node offline'; p.className = 'pill bad'; } } });
   listen('node-failed', () => { if ($('#main').hidden) bootFailed(); else toast('The node stopped repeatedly — try Restart from the tray.'); });
 }
