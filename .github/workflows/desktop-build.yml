@@ -55,20 +55,14 @@ jobs:
         working-directory: desktop
         run: npm ci
 
+      # Unsigned build. Signing is intentionally OFF until certs exist: passing EMPTY APPLE_*/WINDOWS_*
+      # secrets makes Tauri treat signing as requested and fail importing a nonexistent certificate.
+      # To sign later, add the secrets and restore an env: block with APPLE_CERTIFICATE,
+      # APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID and
+      # WINDOWS_CERTIFICATE, WINDOWS_CERTIFICATE_PASSWORD.
       - name: Build app
         working-directory: desktop
         run: npm run tauri -- build ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
-        env:
-          # ── macOS signing + notarization (leave unset → unsigned build) ──
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # ── Windows Authenticode (leave unset → unsigned build) ──
-          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
 
       - name: Upload installers (workflow artifacts — for a manual/dispatch run)
         uses: actions/upload-artifact@v4
