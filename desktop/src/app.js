@@ -24,6 +24,18 @@ const store = { get: (k, f) => { try { return JSON.parse(localStorage.getItem(k)
 
 let NODE = { port: 19000 };
 let SETUP = null;
+
+// The embedded dashboard runs in a cross-origin iframe with no Tauri access, so its external
+// links (GitHub release, stakepoint, Solscan…) can't open a browser themselves — a plain
+// target="_blank" is a no-op inside the webview. It postMessages them up to us; open them in
+// the system browser via the native opener. Accept only messages from the dashboard's own
+// localhost origin, and only real http(s) URLs.
+window.addEventListener('message', (e) => {
+  const d = e.data;
+  if (!d || d.type !== 'circuit:open-url') return;
+  if (e.origin !== `http://localhost:${NODE.port}`) return;
+  if (typeof d.url === 'string' && /^https?:\/\//i.test(d.url)) invoke('open_url', { url: d.url });
+});
 let payoutWallet = store.get('payoutWallet', '');
 
 function show(view) { ['boot', 'picker', 'main'].forEach(v => { const n = $('#' + v); if (n) n.hidden = (v !== view); }); }

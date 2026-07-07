@@ -1146,6 +1146,21 @@ const logLines = [];
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function $(id) { return document.getElementById(id); }
 
+// External links (target="_blank"): in a normal browser these open a tab as usual. But when this
+// dashboard is embedded as a cross-origin iframe inside the CIRCUIT desktop app, the webview blocks
+// new-window navigation and the link silently does nothing. When iframed, hand the URL to the native
+// shell (the parent window) so it opens in the system browser. Standalone (window === top) is untouched.
+if (window.self !== window.top) {
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest && e.target.closest('a[target="_blank"]');
+    if (!a) return;
+    const href = a.getAttribute('href') || '';
+    if (!/^https?:\/\//i.test(href)) return;   // skip in-page "#" anchors not yet given a real URL
+    e.preventDefault();
+    try { window.parent.postMessage({ type: 'circuit:open-url', url: a.href }, '*'); } catch {}
+  }, true);
+}
+
 function txt(id, val, cls) {
   const el = $(id);
   if (!el) return;
