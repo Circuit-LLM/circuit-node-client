@@ -21,8 +21,11 @@ jobs:
         include:
           - os: macos-latest      # Apple Silicon .dmg
             target: aarch64-apple-darwin
-          - os: macos-13          # Intel .dmg (macos-13 runner is x86_64)
-            target: x86_64-apple-darwin
+          # Intel Mac (macos-13, x86_64) is intentionally NOT built: GitHub-hosted macos-13 runners
+          # are queue-starved for this org — the job sat ~23h in queue on v0.1.5/v0.1.6 and had to be
+          # cancelled, never producing an artifact. timeout-minutes can't help (it doesn't bound queue
+          # time). Re-add here only once a runner is reliably available, or wire a universal-apple-darwin
+          # build (needs the sidecar to lipo both arches — build-sidecar.mjs currently rejects universal).
           - os: ubuntu-22.04      # .AppImage + .deb
             target: ""
           - os: windows-latest    # .msi + nsis .exe
