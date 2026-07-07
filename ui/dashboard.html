@@ -1044,6 +1044,39 @@ code{font-family:var(--font);font-size:.94em;background:rgba(224,192,60,.05);bor
         <div class="kv"><span class="kv-k">Data API</span><span class="kv-v amber">x402 (CIRC)</span></div>
       </div>
 
+      <div id="ag-paused" class="card mb" style="display:none;border-color:var(--amber)">
+        <div class="card-t" style="color:var(--amber)">⏸ Trading Paused</div>
+        <div class="kv"><span class="kv-k">Reason</span><span class="kv-v amber" id="ag-paused-reason">—</span></div>
+        <div class="kv"><span class="kv-k">Since</span><span class="kv-v" id="ag-paused-since">—</span></div>
+      </div>
+
+      <div class="card mb">
+        <div class="card-t">Performance</div>
+        <div class="kv"><span class="kv-k">Win Rate</span><span class="kv-v" id="ag-winrate">—</span></div>
+        <div class="kv"><span class="kv-k">Realized P&amp;L</span><span class="kv-v" id="ag-realized">—</span></div>
+        <div class="kv"><span class="kv-k">Total Trades</span><span class="kv-v" id="ag-trades">—</span></div>
+      </div>
+
+      <div id="ag-strategy-card" class="card mb" style="display:none">
+        <div class="card-t">Session Strategy</div>
+        <div class="kv"><span class="kv-k">Mode</span><span class="kv-v" id="ag-strat-mode">—</span></div>
+        <div class="kv"><span class="kv-k">Patterns</span><span class="kv-v" id="ag-strat-patterns">—</span></div>
+        <div class="kv"><span class="kv-k">Min Score</span><span class="kv-v" id="ag-strat-score">—</span></div>
+        <div class="kv"><span class="kv-k">Buys Used</span><span class="kv-v" id="ag-strat-buys">—</span></div>
+        <div class="kv"><span class="kv-k">Expires</span><span class="kv-v" id="ag-strat-expires">—</span></div>
+        <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.7" id="ag-strat-goal"></div>
+      </div>
+
+      <div class="card mb">
+        <div class="card-t">Risk Config</div>
+        <div class="kv"><span class="kv-k">Entry Size</span><span class="kv-v" id="ag-cfg-entry">—</span></div>
+        <div class="kv"><span class="kv-k">Stop Loss</span><span class="kv-v" id="ag-cfg-sl">—</span></div>
+        <div class="kv"><span class="kv-k">Take Profit</span><span class="kv-v" id="ag-cfg-tp">—</span></div>
+        <div class="kv"><span class="kv-k">Max Hold</span><span class="kv-v" id="ag-cfg-hold">—</span></div>
+        <div class="kv"><span class="kv-k">Max Positions</span><span class="kv-v" id="ag-cfg-maxpos">—</span></div>
+        <div class="kv"><span class="kv-k">Trailing Stop</span><span class="kv-v" id="ag-cfg-trail">—</span></div>
+      </div>
+
       <div id="ag-positions-card" class="card mb" style="display:none">
         <div class="card-t">Open Positions</div>
         <div id="ag-positions-list"></div>
@@ -1145,6 +1178,16 @@ const logLines = [];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function $(id) { return document.getElementById(id); }
+
+// Relative label for a strategy expiry timestamp: "in 22m" / "in 1h05m" / "expired".
+function _expiresLabel(iso) {
+  if (!iso) return '—';
+  const ms = new Date(iso).getTime() - Date.now();
+  if (isNaN(ms)) return '—';
+  if (ms <= 0) return 'expired';
+  const m = Math.round(ms / 60000);
+  return m < 60 ? `in ${m}m` : `in ${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}m`;
+}
 
 // External links (target="_blank"): in a normal browser these open a tab as usual. But when this
 // dashboard is embedded as a cross-origin iframe inside the CIRCUIT desktop app, the webview blocks
@@ -1707,6 +1750,44 @@ function renderAgent() {
   $('ag-pnl').style.color     = pnl >= 0 ? 'var(--green)' : 'var(--red)';
   $('ag-id').textContent      = d.agentId ?? '—';
   $('ag-wallet').textContent  = d.address ? d.address.slice(0, 8) + '…' + d.address.slice(-4) : '—';
+
+  // Paused banner (only when the agent has halted buys)
+  const paused = d.paused;
+  $('ag-paused').style.display = paused ? 'block' : 'none';
+  if (paused) {
+    $('ag-paused-reason').textContent = paused.reason ?? '—';
+    $('ag-paused-since').textContent  = paused.since ? new Date(paused.since).toLocaleString() : '—';
+  }
+
+  // Performance (realized)
+  const st = d.stats ?? {};
+  $('ag-winrate').textContent = st.winRate != null ? st.winRate + '%' : '—';
+  const rp = st.realizedPnlSol ?? 0;
+  $('ag-realized').textContent = (rp >= 0 ? '+' : '') + rp.toFixed(4) + ' SOL';
+  $('ag-realized').style.color = rp >= 0 ? 'var(--green)' : 'var(--red)';
+  $('ag-trades').textContent   = st.trades ?? '—';
+
+  // Session strategy
+  const strat = d.strategy ?? {};
+  const hasStrat = !!(strat.mode || strat.goal);
+  $('ag-strategy-card').style.display = hasStrat ? 'block' : 'none';
+  if (hasStrat) {
+    $('ag-strat-mode').textContent     = strat.mode ?? '—';
+    $('ag-strat-patterns').textContent = (strat.patternFilter && strat.patternFilter.length) ? strat.patternFilter.join(', ') : 'any';
+    $('ag-strat-score').textContent    = strat.minScore ?? '—';
+    $('ag-strat-buys').textContent     = (strat.buysUsed != null && strat.buysMax != null) ? `${strat.buysUsed} / ${strat.buysMax}` : '—';
+    $('ag-strat-expires').textContent  = _expiresLabel(strat.expiresAt);
+    $('ag-strat-goal').textContent     = strat.goal ?? '';
+  }
+
+  // Risk config
+  const cfg = d.config ?? {};
+  $('ag-cfg-entry').textContent  = cfg.entryBudgetSol != null ? cfg.entryBudgetSol + ' SOL' : '—';
+  $('ag-cfg-sl').textContent     = cfg.stopLossPct != null ? cfg.stopLossPct + '%' : '—';
+  $('ag-cfg-tp').textContent     = cfg.takeProfitPct != null ? '+' + cfg.takeProfitPct + '%' : '—';
+  $('ag-cfg-hold').textContent   = cfg.maxHoldMinutes != null ? cfg.maxHoldMinutes + ' min' : '—';
+  $('ag-cfg-maxpos').textContent = cfg.maxOpenPositions ?? '—';
+  $('ag-cfg-trail').textContent  = cfg.trailingStop ?? '—';
 
   // Open positions list
   const posList = d.positions ?? [];
@@ -2559,8 +2640,13 @@ async function inferSend() {
   _inferAppend(text, 'user');
 
   const msgEl = _inferAppend('', 'assistant', true);
-  let fullText = '';
 
+  // Non-streaming request. Consuming an SSE stream via fetch().body.getReader() is unreliable
+  // inside the embedded desktop webview — the body never arrives and the reply stays blank. One
+  // buffered JSON completion renders reliably everywhere. A client-side timeout guards a hang, and
+  // an empty completion is reported with the HTTP status + backend so failures aren't silent.
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 90000);
   try {
     const resp = await fetch('/inference/chat', {
       method:  'POST',
@@ -2569,7 +2655,9 @@ async function inferSend() {
         messages:    inferMessages.slice(-12),
         max_tokens:  1024,
         temperature: 0.7,
+        stream:      false,
       }),
+      signal: ctl.signal,
     });
 
     if (resp.status === 402) {
@@ -2581,53 +2669,35 @@ async function inferSend() {
       _inferAppend(err.message || err.error || 'Inference needs a live node or CIRC payment — this node is not recognised as live on the network yet.', 'error');
       return;
     }
-    if (!resp.ok || !resp.body) {
+    if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
       msgEl.remove();
       inferMessages.pop();
-      _inferAppend('Error: ' + (err.error || err.message || resp.statusText), 'error');
+      _inferAppend('Error ' + resp.status + ': ' + (err.error || err.message || resp.statusText), 'error');
       return;
     }
 
-    // Stream SSE
-    const reader  = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop() ?? '';
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const payload = line.slice(6).trim();
-        if (payload === '[DONE]') break;
-        try {
-          const parsed  = JSON.parse(payload);
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            fullText += content;
-            const cursor = msgEl.querySelector('.chat-cursor');
-            if (cursor) cursor.insertAdjacentText('beforebegin', content);
-            else msgEl.textContent += content;
-            _inferScroll();
-          }
-        } catch {}
-      }
-    }
-
+    const data    = await resp.json().catch(() => null);
+    const content = data?.choices?.[0]?.message?.content ?? '';
     msgEl.querySelector('.chat-cursor')?.remove();
-    if (fullText) inferMessages.push({ role: 'assistant', content: fullText });
-    else { msgEl.textContent = '(no response)'; }
+    if (content) {
+      msgEl.textContent = content;
+      inferMessages.push({ role: 'assistant', content });
+      _inferScroll();
+    } else {
+      const backend = resp.headers.get('x-circuit-backend') || 'network';
+      msgEl.textContent = `(no reply — HTTP ${resp.status}, ${backend})`;
+    }
 
   } catch (err) {
     msgEl?.querySelector('.chat-cursor')?.remove();
-    if (!fullText) msgEl?.remove();
-    _inferAppend('Connection error: ' + err.message, 'error');
+    msgEl?.remove();
     inferMessages.pop();
+    _inferAppend(err.name === 'AbortError'
+      ? 'Inference timed out — the network took too long to reply.'
+      : 'Connection error: ' + err.message, 'error');
   } finally {
+    clearTimeout(timer);
     inferPending = false;
     $('infer-send').disabled = false;
   }
