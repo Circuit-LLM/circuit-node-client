@@ -2508,9 +2508,13 @@ async function _inferCheckStatus() {
       if (d.model) txt('infer-model-label', `${d.model.toUpperCase()} · CIRCUIT NETWORK`);
       $('infer-send').disabled = false;
     } else {
+      // Engine /health is down, but the gateway falls back to a hosted model when
+      // the mesh is offline (same behaviour as the website /dllm). So DON'T gate the
+      // chat on /health — keep Send enabled and let the request go; the gateway
+      // decides mesh-vs-fallback. Only a genuinely unreachable proxy (catch) blocks.
       if (dot) dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:var(--amber);flex-shrink:0;transition:background .3s';
-      txt('infer-status-text', 'Inference unavailable — node not recognised as live yet');
-      _inferAppend('Free inference is served to LIVE nodes. Make sure this node-client is registered on the network (it announces on start); inference becomes available once it is online.', 'system');
+      txt('infer-status-text', 'Mesh offline — replies served via network fallback');
+      $('infer-send').disabled = false;
     }
   } catch {
     if (dot) dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:var(--red);flex-shrink:0;transition:background .3s';
@@ -2554,9 +2558,12 @@ async function inferSend() {
     });
 
     if (resp.status === 402) {
+      const err = await resp.json().catch(() => ({}));
       msgEl.remove();
       inferMessages.pop();
-      _inferAppend('Inference requires CIRC payment — the coordinator is not available on localhost.', 'error');
+      // Surface the gateway's own message (it explains the live-node requirement);
+      // fall back to a generic line only if the body is empty.
+      _inferAppend(err.message || err.error || 'Inference needs a live node or CIRC payment — this node is not recognised as live on the network yet.', 'error');
       return;
     }
     if (!resp.ok || !resp.body) {
