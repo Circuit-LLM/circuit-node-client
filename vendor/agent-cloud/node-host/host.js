@@ -106,9 +106,13 @@ async function resolveWorkload(a, dir) {
   // is the compiled binary — it can't run `node <script>`). When CIRCUIT_SELF_EXEC is set, re-exec THIS
   // binary in the workload role instead. Under a real node (dev/prod), the original spawn is unchanged.
   if (process.env.CIRCUIT_SELF_EXEC) {
+    if (w === 'signal-scout') return { command: process.execPath, args: ['signal-scout'], cwd: dir };
     if (w === 'circuit-agent') return { command: process.execPath, args: ['agent', 'start'], cwd: dir };
     return { command: process.execPath, args: ['agentd'], cwd: dir }; // built-in reference workload
   }
+  // signal-scout: first-party research/signal type, vendored as a self-contained single file (its @circuit-llm
+  // deps are esbuild-bundled in), so it runs with plain `node <entry>` — no node_modules on the host.
+  if (w === 'signal-scout') return { command: process.execPath, args: [path.join(REPO, 'signal-agent', 'agent.cjs')], cwd: dir };
   if (w === 'circuit-agent') return { command: process.execPath, args: [path.join(CFG.circuitAgentDir, 'agent.js'), 'start'], cwd: dir };
   return { command: process.execPath, args: [path.join(REPO, 'agentd', 'agentd.js')], cwd: dir }; // reference workload
 }

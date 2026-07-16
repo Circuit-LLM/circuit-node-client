@@ -11,7 +11,7 @@ import path from 'node:path';
 
 // Service-endpoint URLs with NO embedded credential (agents authenticate via x402/session). Safe to
 // forward at any trust level.
-export const ENDPOINT_ENV = ['CIRCUIT_API_URL', 'GATEWAY_URL', 'PRICE_FEED_URL', 'CIRCUIT_INFERENCE_URL'];
+export const ENDPOINT_ENV = ['CIRCUIT_API_URL', 'CIRCUIT_DATA_URL', 'GATEWAY_URL', 'PRICE_FEED_URL', 'CIRCUIT_INFERENCE_URL'];
 
 // Endpoint URLs that MAY embed a credential (e.g. a keyed Helius RPC URL). Forwarded verbatim ONLY to
 // trusted built-ins. For an UNTRUSTED bundle the keyed value is withheld; if the operator set a keyless/
@@ -19,7 +19,9 @@ export const ENDPOINT_ENV = ['CIRCUIT_API_URL', 'GATEWAY_URL', 'PRICE_FEED_URL',
 export const CREDENTIALED_ENDPOINT_ENV = ['CIRCUIT_RPC_URL'];
 
 // First-party workload secrets — forwarded ONLY to trusted built-in workloads, never to a bundle.
-export const SECRET_ENV = ['AGENT_KEYPAIR', 'CIRCUIT_SETUP_KEYPAIR', 'CIRCUIT_INTERNAL_KEY',
+// CIRCUIT_WALLET is the SDK's payment-wallet var (@circuit-llm/wallet reads it); AGENT_KEYPAIR is the
+// trading-agent convention — forward both so an SDK agent (e.g. signal-scout) gets its x402 wallet.
+export const SECRET_ENV = ['AGENT_KEYPAIR', 'CIRCUIT_WALLET', 'CIRCUIT_SETUP_KEYPAIR', 'CIRCUIT_INTERNAL_KEY',
   'JUPITER_API_KEY', 'OPENROUTER_API_KEY', 'TELEGRAM_BOT_TOKEN'];
 
 // Cosmetic passthroughs — safe at any trust level.
