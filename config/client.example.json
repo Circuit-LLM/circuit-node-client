@@ -2,6 +2,7 @@
   "_comment": "circuit-node-client configuration. Edit before first run.",
   "network": {
     "registryUrl": "https://node.circuitllm.xyz",
+    "dataApiUrl": "https://api.circuitllm.xyz",
     "bootstrapUrl": "https://node.circuitllm.xyz",
     "bootstrapPort": 18500,
     "networkVersion": 1,
