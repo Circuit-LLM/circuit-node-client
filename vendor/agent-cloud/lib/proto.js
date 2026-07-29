@@ -1,6 +1,8 @@
 // Shared protocol constants + helpers for the agent cloud.
 // Zero dependencies — used by the control plane, node-host, signer, and CLI.
 
+import { nodeRunsWorkload, workloadOf } from './agent-types.js';
+
 export const PROTO_VERSION = 2;
 
 // Agent lifecycle states (control-plane authoritative).
@@ -32,7 +34,12 @@ export function isFirstPartyNodeRuntime(publisher, firstPartyKeys) {
 
 export function nodeSatisfies(node, agent) {
   const b = agent?.spec?.bundle;
-  if (!b) return true; // built-in workload — no sandbox requirement
+  // Built-in (sealed, first-party) workload — no SANDBOX requirement, but the node must actually be
+  // able to LAUNCH this type. Without this the scheduler would place any workload anywhere, and an
+  // older host that never heard of the type resolved it to the default one: a scout silently started
+  // as a paper trader, indistinguishable in the hub. A node that can't run it now simply isn't a
+  // candidate, so the agent stays honestly PENDING until one that can shows up.
+  if (!b) return nodeRunsWorkload(node, workloadOf(agent?.spec));
   const oci = (b.runtime || b.manifest?.runtime) === 'oci';
   // The required isolation tier = the runtime's floor (oci ⇒ container; node ⇒ curated-env), raised to
   // the owner's optional spec.requireSandbox. An owner sets requireSandbox:'microvm' to INSIST on a

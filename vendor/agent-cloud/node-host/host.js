@@ -16,6 +16,7 @@ import { resolveEgressHosts } from './egress-proxy.js';
 import { detectOciRuntime, detectMicroVm, buildContainerSpec, DEFAULT_OCI_IMAGE } from './oci.js';
 import { loadOrCreateNodeKey, signNodeHeaders } from '../lib/node-auth.js';
 import { isFirstPartyNodeRuntime } from '../lib/proto.js';
+import { workloadOf } from '../lib/agent-types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
@@ -31,6 +32,8 @@ const CFG = {
   key: process.env.CIRCUIT_CLOUD_KEY || '',
   heartbeatMs: Number(process.env.HEARTBEAT_MS || 8000),
   circuitAgentDir: process.env.CIRCUIT_AGENT_DIR || path.join(os.homedir(), 'circuit-agent'),
+  signalAgentDir: process.env.CIRCUIT_SIGNAL_AGENT_DIR || path.join(os.homedir(), 'circuit-signal-agent'),
+  nftAgentDir: process.env.CIRCUIT_NFT_AGENT_DIR || path.join(os.homedir(), 'circuit-nft-agent'),
   // B1+: where verified bundles are unpacked (cached by sha256), and what isolation this node can
   // enforce — 'node' = curated-env + cgroup + RO-bind (trusted bundles), 'oci' = container (B2),
   // 'none' = built-in workloads only. The scheduler won't place a bundle a node can't sandbox.
@@ -98,23 +101,61 @@ const api = async (method, p, body) => {
   return r.json();
 };
 
+// The sealed (first-party) workloads THIS host can launch. The KEYS are what we advertise to the
+// control plane as caps.workloads, so the scheduler never hands us a type this binary can't resolve —
+// a type added here is automatically offered, and one that isn't here is never placed instead of being
+// silently swapped for the default. (A BUNDLE is the other, untrusted path — see resolveBundle.)
+//
+// A node-host runs in three environments, so each type says how to launch in each:
+//   self-exec — inside the bun-COMPILED desktop sidecar there is no system node and process.execPath
+//               IS the binary, so we re-exec ourselves in the workload `role`.
+//   vendored  — a self-contained single file shipped beside the host (deps esbuild'd in, so it runs
+//               with plain `node <entry>` and needs no node_modules on the operator's box).
+//   source    — a checkout on the operator's box (CIRCUIT_*_AGENT_DIR).
+// Preferring vendored-then-source is what lets ONE host.js serve both this repo and the node-client's
+// vendored copy. The two used to diverge here, which is how the vendored copy silently fell a release
+// behind on everything else in this file.
+const vendoredEntry = (sub) => { const p = path.join(REPO, sub, 'agent.cjs'); return fs.existsSync(p) ? p : null; };
+const WORKLOADS = {
+  'agentd': {
+    role: ['agentd'],
+    resolve: (dir) => ({ command: process.execPath, args: [path.join(REPO, 'agentd', 'agentd.js')], cwd: dir }),
+  },
+  'circuit-agent': {
+    // No self-exec form: the compiled desktop binary ships no trading runtime and has no checkout to
+    // point at, so a desktop node must NOT advertise this type — it could never start it.
+    selfExec: false,
+    resolve: (dir) => ({ command: process.execPath, args: [path.join(CFG.circuitAgentDir, 'agent.js'), 'start'], cwd: dir }),
+  },
+  'signal-scout': {
+    role: ['signal-scout'],
+    resolve: (dir) => ({ command: process.execPath, args: [vendoredEntry('signal-agent') || path.join(CFG.signalAgentDir, 'agent.mjs')], cwd: dir }),
+  },
+  'nft-scout': {
+    role: ['nft-scout'],
+    resolve: (dir) => ({ command: process.execPath, args: [vendoredEntry('nft-agent') || path.join(CFG.nftAgentDir, 'agent.mjs')], cwd: dir }),
+  },
+};
+// Advertise only what this host can ACTUALLY start right now — a type whose entry file isn't on disk
+// (no checkout, nothing vendored) would otherwise be placed here and then fail at spawn. Computed at
+// register time rather than at import, so a host that gains a checkout only has to re-register.
+function supportedWorkloads() {
+  return Object.keys(WORKLOADS).filter((w) => {
+    const t = WORKLOADS[w];
+    if (process.env.CIRCUIT_SELF_EXEC) return t.selfExec !== false;
+    try { return fs.existsSync(t.resolve('.').args[0]); } catch { return false; }
+  });
+}
+
 async function resolveWorkload(a, dir) {
   const spec = a.spec || {};
   if (a.bundle || spec.bundle) return resolveBundle(a, dir);      // B1+: a user-published bundle
-  const w = spec.workload || 'agentd';
-  // Desktop app: the node-host runs inside a bun-COMPILED sidecar (no system node, and process.execPath
-  // is the compiled binary — it can't run `node <script>`). When CIRCUIT_SELF_EXEC is set, re-exec THIS
-  // binary in the workload role instead. Under a real node (dev/prod), the original spawn is unchanged.
-  if (process.env.CIRCUIT_SELF_EXEC) {
-    if (w === 'signal-scout') return { command: process.execPath, args: ['signal-scout'], cwd: dir };
-    if (w === 'circuit-agent') return { command: process.execPath, args: ['agent', 'start'], cwd: dir };
-    return { command: process.execPath, args: ['agentd'], cwd: dir }; // built-in reference workload
-  }
-  // signal-scout: first-party research/signal type, vendored as a self-contained single file (its @circuit-llm
-  // deps are esbuild-bundled in), so it runs with plain `node <entry>` — no node_modules on the host.
-  if (w === 'signal-scout') return { command: process.execPath, args: [path.join(REPO, 'signal-agent', 'agent.cjs')], cwd: dir };
-  if (w === 'circuit-agent') return { command: process.execPath, args: [path.join(CFG.circuitAgentDir, 'agent.js'), 'start'], cwd: dir };
-  return { command: process.execPath, args: [path.join(REPO, 'agentd', 'agentd.js')], cwd: dir }; // reference workload
+  const w = workloadOf(spec);
+  const t = WORKLOADS[w];
+  // Fail LOUDLY. The old fallback-to-agentd made an unknown workload look like a successful start.
+  if (!t) throw new Error(`unsupported workload "${w}" — this host runs: ${supportedWorkloads().join(', ')}`);
+  if (process.env.CIRCUIT_SELF_EXEC) return { command: process.execPath, args: t.role, cwd: dir };
+  return t.resolve(dir);
 }
 
 // B1/B2 — pull → verify (sha256 + manifest sig + owner binding) → unpack (cache by sha256) → run.
@@ -248,7 +289,7 @@ async function startAgent(a) {
   const env = buildAgentEnv(a, dir);
   const proc = spawn(command, args, { cwd: cwd || dir, env, stdio: ['ignore', 'pipe', 'pipe'] });
   const cgrouped = applyCgroup(proc.pid, a);
-  const rec = { proc, proxy, name: a.name, workload: (a.bundle || a.spec?.bundle) ? `bundle:${resolved.proxy ? 'oci' : 'node'}` : (a.spec?.workload || 'agentd'), dir, cgrouped, logBuf: [], lastSent: 0, startedAt: Date.now() };
+  const rec = { proc, proxy, name: a.name, workload: (a.bundle || a.spec?.bundle) ? `bundle:${resolved.proxy ? 'oci' : 'node'}` : workloadOf(a.spec), dir, cgrouped, logBuf: [], lastSent: 0, startedAt: Date.now() };
   agents.set(a.id, rec);
 
   const onData = (buf) => {
@@ -339,12 +380,33 @@ function resolveSandbox() {
 
 async function register() {
   const sandbox = resolveSandbox();
+  const supported = supportedWorkloads();
   await api('POST', '/v1/nodes/register', {
     nodeId: CFG.nodeId,
-    caps: { cpu: CFG.maxCpu, sandbox },
+    caps: { cpu: CFG.maxCpu, sandbox, workloads: supported },
     budget: { maxAgents: CFG.maxAgents, maxCpu: CFG.maxCpu, maxMemoryMb: CFG.maxMemoryMb },
   });
-  log(`registered as ${CFG.nodeId} (budget ${CFG.maxAgents} agents, ${CFG.maxMemoryMb}MB, sandbox=${sandbox})`);
+  log(`registered as ${CFG.nodeId} (budget ${CFG.maxAgents} agents, ${CFG.maxMemoryMb}MB, sandbox=${sandbox}, workloads=${supported.join(',')})`);
+}
+
+// ── Command Inbox relay (docs/COMMAND_INBOX.md) ───────────────────────────────
+// Pull pending owner-signed commands for an agent and drop them in its dataDir; relay the
+// agent's applied/rejected acks back. The node-host is a dumb pipe — it never signs or
+// verifies; authenticity is the owner's signature on each command, which the AGENT checks.
+// A withholding/tampering host can only cause a visible liveness failure (the ack never
+// lands), never forge a command.
+async function relayCommands(id, rec) {
+  // 1. fetch pending → write the agent's inbox file (all pending; the agent's fence dedups)
+  try {
+    const { commands = [], ownerPubkeyHex = null } = await api('GET', `/v1/agents/${id}/commands`);
+    fs.writeFileSync(path.join(rec.dir, 'commands.json'), JSON.stringify({ ownerPubkeyHex, commands }));
+  } catch { /* CP unreachable → agent keeps its last inbox; core loop is unaffected */ }
+  // 2. relay the agent's acks (idempotent at the CP — resolved ids are dropped on re-relay)
+  try {
+    const raw = fs.readFileSync(path.join(rec.dir, 'command-acks.json'), 'utf8');
+    const acks = JSON.parse(raw)?.acks;
+    if (Array.isArray(acks) && acks.length) await api('POST', `/v1/agents/${id}/commands/ack`, { acks });
+  } catch { /* no acks yet, or CP unreachable */ }
 }
 
 async function beat() {
@@ -369,6 +431,7 @@ async function beat() {
     const lines = rec.logBuf.filter((l) => l.ts > rec.lastSent);
     rec.lastSent = Date.now();
     api('POST', `/v1/agents/${id}/report`, { health, lines }).catch(() => {});
+    relayCommands(id, rec).catch(() => {}); // Command Inbox (docs/COMMAND_INBOX.md)
   }
   writeStatus();
 }

@@ -35185,39 +35185,34 @@ function makeWallet(opts = {}) {
 // agent.mjs
 var import_node_fs = require("node:fs");
 var import_node_path = require("node:path");
-var WSOL = "So11111111111111111111111111111111111111112";
 var clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 var num = (v, d = 0) => Number.isFinite(Number(v)) ? Number(v) : d;
-var fmtVol = (v) => v >= 1e9 ? (v / 1e9).toFixed(1) + "B" : v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? (v / 1e3).toFixed(0) + "k" : String(Math.round(v));
-var SignalScout = class extends CircuitAgent {
-  // Command Inbox (circuit-agent-cloud/docs/COMMAND_INBOX.md): the knobs an OWNER may live-tune
-  // via a signed config-patch. Deliberately narrow — `model` rebuilds the inference client and
-  // `webhookUrl` is env-pinned on the mesh, so those stay restart-only; these four take effect on
-  // the next tick (applyKnobs re-reads them). This is Scout's sealed "world" for remote control.
+var shortColl = (c) => `${String(c).slice(0, 4)}\u2026${String(c).slice(-4)}`;
+var NftScout = class extends CircuitAgent {
+  // Live-tunable knobs an OWNER may patch via a signed config-patch (Command Inbox). Narrow on purpose.
   commandSchemaKeys() {
-    return ["topN", "minChangePct", "useDllm", "attest"];
+    return ["scanN", "topN", "minSpreadSol", "minSpreadPct", "minMovePct", "sort", "watchFloors", "useDllm", "attest"];
   }
-  // One-shot actions an owner may invoke (Phase 2). `resetBaseline` clears the momentum
-  // memory so tick-over-tick comparison starts fresh — useful after a market gap or a config
-  // change. Runs at most once per command (the base fences + commits before onCommand).
   commandActions() {
     return ["resetBaseline"];
   }
   async onCommand(cmd) {
-    const action = cmd.payload?.action;
-    if (action === "resetBaseline") {
-      this.prev = {};
-      this.log("action resetBaseline \u2014 momentum baseline cleared");
+    if (cmd.payload?.action === "resetBaseline") {
+      this.prevFloor = {};
+      this.log("action resetBaseline \u2014 floor baseline cleared");
       return { applied: true };
     }
-    return { applied: false, reason: `unknown-action:${action}` };
+    return { applied: false, reason: `unknown-action:${cmd.payload?.action}` };
   }
-  // Re-derive the live-tunable knobs from this.config. Called in setup() and at the TOP of each
-  // tick(), so a config-patch the base applied before this tick takes effect immediately.
   applyKnobs() {
     const cfg = this.config;
-    this.topN = num(cfg.topN, 5);
-    this.minChangePct = num(cfg.minChangePct, 0);
+    this.scanN = clamp(num(cfg.scanN, 20), 1, 100);
+    this.topN = clamp(num(cfg.topN, 5), 1, 25);
+    this.minSpreadSol = num(cfg.minSpreadSol, 0.05);
+    this.minSpreadPct = num(cfg.minSpreadPct, 5);
+    this.minMovePct = num(cfg.minMovePct, 12);
+    this.sort = ["listed", "floor", "-floor"].includes(cfg.sort) ? cfg.sort : "listed";
+    this.watchFloors = cfg.watchFloors && typeof cfg.watchFloors === "object" ? cfg.watchFloors : {};
     this.useDllm = cfg.useDllm !== false;
     this.doAttest = !!cfg.attest;
   }
@@ -35226,7 +35221,7 @@ var SignalScout = class extends CircuitAgent {
     this.applyKnobs();
     this.model = cfg.model || void 0;
     this.webhookUrl = process.env.WEBHOOK_URL || cfg.webhookUrl || "";
-    this.prev = {};
+    this.prevFloor = {};
     if (!process.env.CIRCUIT_WALLET && process.env.AGENT_KEYPAIR) process.env.CIRCUIT_WALLET = process.env.AGENT_KEYPAIR;
     this.internalKey = process.env.CIRCUIT_INTERNAL_KEY || void 0;
     let wallet;
@@ -35253,54 +35248,83 @@ var SignalScout = class extends CircuitAgent {
     });
     this.signalsFile = (0, import_node_path.join)(this.ctx.dataDir, "signals.jsonl");
     this.produced = 0;
-    this.byStance = { bullish: 0, bearish: 0, neutral: 0 };
+    this.byType = { arb: 0, "floor-hit": 0, "floor-move": 0 };
     this.last = null;
+    this.lastEmitted = {};
     const pay = this.internalKey ? "internal-key" : wallet ? "payment-wallet" : "free-only";
-    this.log(`signal-scout ready \u2014 topN=${this.topN} dllm=${this.useDllm} attest=${this.doAttest} pay=${pay} webhook=${this.webhookUrl ? "on" : "off"}`);
+    if (pay === "free-only") this.log("\u26A0 no payment credential (CIRCUIT_WALLET / CIRCUIT_INTERNAL_KEY) \u2014 NFT data is x402-paid, so no signals can be produced until one is set");
+    this.log(`nft-scout ready \u2014 scanN=${this.scanN} topN=${this.topN} minSpread=${this.minSpreadSol}SOL/${this.minSpreadPct}% watch=${Object.keys(this.watchFloors).length} dllm=${this.useDllm} attest=${this.doAttest} pay=${pay} webhook=${this.webhookUrl ? "on" : "off"}`);
   }
   async tick() {
     this.applyKnobs();
-    let trend;
+    let floors;
     try {
-      trend = await this.dataClient.priceFeedTrending({ limit: 25 });
+      floors = await this.dataClient.get("/api/nft/floors", { limit: this.scanN, sort: this.sort });
     } catch (e) {
-      this.log(`data error: ${e.message}`);
+      this.log(`floors error: ${e.message}`);
       return;
     }
-    const cands = normalizeList(trend).filter((c) => {
-      const m = c.mint || c.address;
-      return m && m !== WSOL && num(c.priceUsd) > 0;
-    });
+    const list = floors && floors.collections || [];
+    const cands = [.../* @__PURE__ */ new Set([...Object.keys(this.watchFloors), ...list.map((c) => c.collection)])].slice(0, this.scanN);
     if (!cands.length) {
       this.log("no candidates this tick");
       return;
     }
-    let made = 0, warming = 0;
-    for (const c of cands) {
-      if (made >= this.topN) break;
-      const mint = c.mint || c.address;
-      const price = num(c.priceUsd);
-      const prev = this.prev[mint];
-      this.prev[mint] = price;
-      if (!(prev > 0)) {
-        warming++;
+    const opps = [];
+    for (const collection of cands) {
+      let d;
+      try {
+        d = await this.dataClient.get(`/api/nft/collection/${collection}`, { listings: 1 });
+      } catch {
         continue;
       }
-      const change = (price - prev) / prev * 100;
-      if (this.minChangePct && Math.abs(change) < this.minChangePct) continue;
-      const snap = { mint, sym: c.symbol || `${mint.slice(0, 4)}\u2026`, priceUsd: price, volumeSol: num(c.volumeSol), change };
-      const signal = await this.analyze(snap);
+      if (!d || d.floorSol == null) continue;
+      const floor = num(d.floorSol);
+      const prev = this.prevFloor[collection];
+      this.prevFloor[collection] = floor;
+      if (d.floorBelowBid && d.topBidSol != null && floor > 0) {
+        const spreadSol = num(d.spreadSol);
+        const spreadPct = spreadSol / floor * 100;
+        if (spreadSol >= this.minSpreadSol && spreadPct >= this.minSpreadPct) {
+          opps.push({ type: "arb", collection, floorSol: floor, topBidSol: num(d.topBidSol), spreadSol, spreadPct, listed: num(d.listed), rank: spreadSol });
+        }
+      }
+      const target = num(this.watchFloors[collection], 0);
+      if (target > 0 && floor <= target) {
+        opps.push({ type: "floor-hit", collection, floorSol: floor, targetSol: target, listed: num(d.listed), rank: target - floor + 1e6 });
+      }
+      if (prev > 0) {
+        const movePct = (floor - prev) / prev * 100;
+        if (Math.abs(movePct) >= this.minMovePct) {
+          opps.push({ type: "floor-move", collection, floorSol: floor, prevFloorSol: prev, movePct, listed: num(d.listed), rank: Math.abs(movePct) });
+        }
+      }
+    }
+    const order = { arb: 0, "floor-hit": 1, "floor-move": 2 };
+    opps.sort((a, b) => order[a.type] - order[b.type] || b.rank - a.rank);
+    let made = 0, dup = 0;
+    for (const opp of opps) {
+      if (made >= this.topN) break;
+      const key = `${opp.type}:${opp.collection}`;
+      const sig = oppSignature(opp);
+      if (this.lastEmitted[key] === sig) {
+        dup++;
+        continue;
+      }
+      const signal = await this.analyze(opp);
       if (!signal) continue;
       await this.publish(signal);
+      this.lastEmitted[key] = sig;
       made++;
     }
-    this.log(`tick \u2014 ${made} signal(s)${warming ? `, ${warming} warming` : ""} [total ${this.produced}]`);
+    this.log(`tick \u2014 inspected ${cands.length}, ${opps.length} opportunit${opps.length === 1 ? "y" : "ies"}, ${made} new signal(s)${dup ? `, ${dup} unchanged` : ""} [total ${this.produced}]`);
   }
-  async analyze(t) {
-    const base2 = { mint: t.mint, symbol: t.sym, priceUsd: t.priceUsd, change: +num(t.change).toFixed(3), volumeSol: num(t.volumeSol), ts: Date.now() };
+  async analyze(opp) {
+    const base2 = { ...opp, symbol: shortColl(opp.collection), ts: Date.now() };
+    delete base2.rank;
     if (this.useDllm) {
       try {
-        const messages = this.prompt(t);
+        const messages = this.prompt(opp);
         if (this.doAttest && typeof this.ai.chatVerified === "function") {
           const r2 = await this.ai.chatVerified({ messages, maxTokens: 220 });
           return { ...base2, ...parseVerdict(r2.content), source: "dllm", attested: !!r2.receipt, receipt: r2.receipt || null, paymentTx: r2.paymentTx || null };
@@ -35311,12 +35335,13 @@ var SignalScout = class extends CircuitAgent {
         this.log(`inference unavailable (${e.message}) \u2014 heuristic fallback`);
       }
     }
-    return { ...base2, ...heuristic(t), source: "heuristic", attested: false };
+    return { ...base2, ...heuristic(opp), source: "heuristic", attested: false };
   }
-  prompt(t) {
+  prompt(o) {
+    const facts = o.type === "arb" ? `Collection ${o.collection}: floor ${o.floorSol} SOL, best standing collection bid ${o.topBidSol} SOL, gross spread ${o.spreadSol.toFixed(4)} SOL (${o.spreadPct.toFixed(1)}% of floor), ${o.listed} listed. This looks like a buy-floor/sell-into-bid arb.` : o.type === "floor-hit" ? `Collection ${o.collection}: floor ${o.floorSol} SOL reached the accumulation target ${o.targetSol} SOL, ${o.listed} listed.` : `Collection ${o.collection}: floor moved to ${o.floorSol} SOL from ${o.prevFloorSol} SOL (${o.movePct.toFixed(1)}%), ${o.listed} listed.`;
     return [
-      { role: "system", content: 'You are a disciplined Solana market analyst. Given a token snapshot, respond with ONLY a JSON object: {"stance":"bullish|bearish|neutral","confidence":0-100,"thesis":"one sentence","risks":"one sentence"}. No text outside the JSON.' },
-      { role: "user", content: `Token ${t.sym} (${t.mint}). price=$${Number(t.priceUsd).toPrecision(4)}, move_since_last_scan=${num(t.change).toFixed(2)}%, volume=${fmtVol(num(t.volumeSol))}. Give your verdict.` }
+      { role: "system", content: 'You are a disciplined Solana NFT analyst. The spread is GROSS \u2014 creator royalties and marketplace fees (often 5-10% combined) and stale/spoofed bids can erase it. Respond with ONLY a JSON object: {"stance":"act|watch|avoid","confidence":0-100,"thesis":"one sentence","risks":"one sentence"}. No text outside the JSON.' },
+      { role: "user", content: `${facts} Give your verdict.` }
     ];
   }
   async publish(sig) {
@@ -35329,7 +35354,7 @@ var SignalScout = class extends CircuitAgent {
         await fetch(this.webhookUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "circuit-signal", agent: this.ctx.name, signal: sig }),
+          body: JSON.stringify({ type: "circuit-nft-signal", agent: this.ctx.name, signal: sig }),
           signal: AbortSignal.timeout(5e3)
         });
       } catch (e) {
@@ -35337,49 +35362,63 @@ var SignalScout = class extends CircuitAgent {
       }
     }
     this.produced++;
-    this.byStance[sig.stance] = (this.byStance[sig.stance] || 0) + 1;
+    this.byType[sig.type] = (this.byType[sig.type] || 0) + 1;
     this.last = sig;
-    this.log(`SIGNAL ${sig.symbol} ${sig.change >= 0 ? "+" : ""}${sig.change}% \u2192 ${String(sig.stance).toUpperCase()} ${sig.confidence}%${sig.source === "heuristic" ? " (heuristic)" : ""}${sig.attested ? " \u2713attested" : ""} \u2014 ${sig.thesis}`);
+    const detail = sig.type === "arb" ? `spread ${sig.spreadSol.toFixed(4)} SOL (${sig.spreadPct.toFixed(1)}%)` : sig.type === "floor-hit" ? `floor ${sig.floorSol}\u2264${sig.targetSol} SOL` : `${sig.movePct >= 0 ? "+" : ""}${sig.movePct.toFixed(1)}% \u2192 ${sig.floorSol} SOL`;
+    this.log(`SIGNAL ${sig.type.toUpperCase()} ${sig.symbol} ${detail} \u2192 ${String(sig.stance).toUpperCase()} ${sig.confidence}%${sig.source === "heuristic" ? " (heuristic)" : ""}${sig.attested ? " \u2713attested" : ""} \u2014 ${sig.thesis}`);
   }
   heartbeatExtra() {
     return {
-      role: "signal-scout",
+      role: "nft-scout",
       signalsProduced: this.produced,
-      byStance: this.byStance,
-      lastSignal: this.last ? { symbol: this.last.symbol, stance: this.last.stance, confidence: this.last.confidence, source: this.last.source, attested: this.last.attested } : null
+      byType: this.byType,
+      lastSignal: this.last ? { type: this.last.type, symbol: this.last.symbol, stance: this.last.stance, confidence: this.last.confidence, source: this.last.source, attested: this.last.attested } : null
     };
   }
 };
-function normalizeList(trend) {
-  if (Array.isArray(trend)) return trend;
-  return trend && (trend.tokens || trend.data || trend.trending || trend.results) || [];
+function oppSignature(o) {
+  const r = (n) => Number(num(n).toFixed(3));
+  if (o.type === "arb") return `arb:${r(o.floorSol)}:${r(o.topBidSol)}`;
+  if (o.type === "floor-hit") return `hit:${r(o.floorSol)}`;
+  return `move:${r(o.floorSol)}`;
 }
 function parseVerdict(content) {
   try {
     const m = String(content).match(/\{[\s\S]*\}/);
     const j = JSON.parse(m ? m[0] : content);
+    const stance = ["act", "watch", "avoid"].includes(String(j.stance).toLowerCase()) ? String(j.stance).toLowerCase() : "watch";
     return {
-      stance: ["bullish", "bearish", "neutral"].includes(String(j.stance).toLowerCase()) ? String(j.stance).toLowerCase() : "neutral",
+      stance,
       confidence: Math.round(clamp(num(j.confidence, 50), 0, 100)),
       thesis: String(j.thesis || "").slice(0, 240),
       risks: String(j.risks || "").slice(0, 240)
     };
   } catch {
-    return { stance: "neutral", confidence: 50, thesis: String(content || "").slice(0, 180), risks: "" };
+    return { stance: "watch", confidence: 50, thesis: String(content || "").slice(0, 180), risks: "" };
   }
 }
-function heuristic(t) {
-  const ch = num(t.change);
-  const score = clamp(ch * 3, -30, 30);
-  const stance = score > 6 ? "bullish" : score < -6 ? "bearish" : "neutral";
+function heuristic(o) {
+  if (o.type === "arb") {
+    const netPct = o.spreadPct - 8;
+    return {
+      stance: netPct > 5 ? "act" : netPct > 0 ? "watch" : "avoid",
+      confidence: Math.round(clamp(40 + netPct, 0, 90)),
+      thesis: `Floor ${o.floorSol} SOL sits under a ${o.topBidSol} SOL standing bid \u2014 gross edge ${o.spreadPct.toFixed(1)}%.`,
+      risks: "Gross of royalties + fees (~5-10%); the bid may be stale or thin. Verify before acting."
+    };
+  }
+  if (o.type === "floor-hit") {
+    return { stance: "act", confidence: 70, thesis: `Floor ${o.floorSol} SOL reached the ${o.targetSol} SOL accumulation target.`, risks: "Could keep falling \u2014 this is a ladder trigger, not a bottom call." };
+  }
+  const up = o.movePct >= 0;
   return {
-    stance,
-    confidence: Math.round(clamp(45 + Math.abs(score), 0, 92)),
-    thesis: `Observed ${ch >= 0 ? "+" : ""}${ch.toFixed(2)}% since last scan, volume ${fmtVol(num(t.volumeSol))}.`,
-    risks: "Momentum read only \u2014 DLLM offline this tick."
+    stance: "watch",
+    confidence: Math.round(clamp(45 + Math.abs(o.movePct) / 2, 0, 88)),
+    thesis: `Floor ${up ? "rose" : "fell"} ${Math.abs(o.movePct).toFixed(1)}% to ${o.floorSol} SOL since last scan.`,
+    risks: "Floor moves can be a single relist/delist on thin collections."
   };
 }
-new SignalScout().run();
+new NftScout().run();
 /*! Bundled license information:
 
 @noble/hashes/utils.js:

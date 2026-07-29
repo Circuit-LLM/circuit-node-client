@@ -187,6 +187,8 @@ if (command === 'setup') {
   runAgentd();
 } else if (command === 'signal-scout') {
   runSignalScout();
+} else if (command === 'nft-scout') {
+  runNftScout();
 } else if (command === 'start' || !command) {
   runNode();
 } else {
@@ -381,11 +383,18 @@ function runAgentd() {
   import('./vendor/agent-cloud/agentd/agentd.js')
     .catch(err => { console.error('[node-client] agentd workload failed to start:', err); process.exit(1); });
 }
-// signal-scout: a first-party non-trading workload (research/signal service). It's vendored as a
-// self-contained CJS single file (@circuit-llm deps esbuild-bundled in), so the literal require both
-// runs it here and lets the bun-compiled sidecar statically bundle it — no node_modules, no system Node.
+// Sealed non-trading workloads. Each is vendored as a self-contained CJS single file (@circuit-llm deps
+// esbuild-bundled in), so the LITERAL require both runs it here and lets the bun-compiled sidecar
+// statically bundle it — no node_modules, no system Node. The require path must stay a literal string:
+// a computed one (e.g. `require(dir + '/agent.cjs')`) is invisible to bun's static bundler and the
+// compiled binary would ship without the agent.
 function runSignalScout() {
   require('./vendor/agent-cloud/signal-agent/agent.cjs');
+}
+// nft-scout: collection floors + standing bids in, opportunity signals out. Unlike Signal Scout its
+// DATA is x402-paid, so it needs a funded payment credential on this node to sense at all.
+function runNftScout() {
+  require('./vendor/agent-cloud/nft-agent/agent.cjs');
 }
 
 // ── Setup wizard ──────────────────────────────────────────────────────────────

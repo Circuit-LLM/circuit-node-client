@@ -1,0 +1,38 @@
+{
+  "syncedAt": "2026-07-29T08:18:23.730Z",
+  "sources": {
+    "circuit-agent-cloud": {
+      "commit": "043014444b884fca326adf162c4fe6c32fb44a23",
+      "dirty": false
+    },
+    "circuit-signal-agent": {
+      "commit": "152f5f5c0bb79bc244add8be8cd8b076f423fe7b",
+      "dirty": false,
+      "sdk": "^0.2.8",
+      "workload": "signal-scout"
+    },
+    "circuit-nft-agent": {
+      "commit": "09a0a73df1363838ad3c193128aa229a5fb25e82",
+      "dirty": false,
+      "sdk": "^0.2.8",
+      "workload": "nft-scout"
+    }
+  },
+  "files": {
+    "agent-cloud/lib/agent-types.js": "105874fb70bbbbfa02fb9937271f47913766803032f077b072107809b9c0e13a",
+    "agent-cloud/lib/bundle-store.js": "b616823387fbe66f47aa14d173ba324a96e199017051e114a19243f6cdbd3204",
+    "agent-cloud/lib/bundle.js": "47bcdc3272eb72bee89ac7d5aafd3d0248d7f3e2152b1d028c783209271c7cdb",
+    "agent-cloud/lib/ed25519.js": "e97c8c6bd242a5d84dd5b2dfc76827c92b8848374f62337407ff46791a715034",
+    "agent-cloud/lib/netguard.js": "de37e4cf09ac16e5c85bddafc0a1907ae660e2fe0d5cd48528b61eaa581dce6a",
+    "agent-cloud/lib/node-auth.js": "ba8f6c4323158b1275ee280e8e58cf14b6c1e8ef05441a19ded26ac79e2eb4e8",
+    "agent-cloud/lib/proto.js": "fccf8e3c397a5927cc3baf0fc238b73c9c8234c82cbbec7fec95a62c5a07df91",
+    "agent-cloud/node-host/host.js": "d9e0ba6cf2350e86892baa48d1ede59dafc564e659b010de74272b735fc93fea",
+    "agent-cloud/node-host/env.js": "6fdfd4e2dbc7049acdd2891c869747eec24abd2448390b5b50c3e8ac255d0696",
+    "agent-cloud/node-host/oci.js": "b4fd1eaca9f06166827b59bd5294651a604a62b82238f4d97c3240d883a43f1d",
+    "agent-cloud/node-host/egress-proxy.js": "c29a39a30e70a24f98ebc8e9909e6e97d01e9529acad82fbb371da4c00b39c4d",
+    "agent-cloud/node-host/egress-proxy-main.js": "b55b9f4a02779f849a5c02da1f3b4915ab793045847167048c13945f5943317e",
+    "agent-cloud/agentd/agentd.js": "afe3e589dced94debdcc16476497f8f2bcf3f58e7e4037f65629f6a8f0897898",
+    "agent-cloud/signal-agent/agent.cjs": "ab3b519c5bcab465587a17c69265286c7995f18a90645ff378b8070f9e3989f5",
+    "agent-cloud/nft-agent/agent.cjs": "0c53dcb5dcb653d8ecd2d36764ee239827e32d1ef6bca29297f08fb594028ae0"
+  }
+}
