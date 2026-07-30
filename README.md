@@ -5,7 +5,7 @@
 **Run a node on the CIRCUIT distributed network. Serve data, power decentralized LLM inference, and earn CIRC — with a one-command setup and a built-in dashboard.**
 
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/Circuit-LLM/circuit-node-client/releases)
+[![Version](https://img.shields.io/badge/version-0.1.10-blue)](https://github.com/Circuit-LLM/circuit-node-client/releases)
 [![Network](https://img.shields.io/badge/network-CIRCUIT-gold)](https://circuitllm.xyz)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
@@ -22,6 +22,7 @@
 ## What it does
 
 - **Joins the CIRCUIT data mesh** — syncs on-chain data from the canonical hub and serves it locally. In Phase 2, each node owns a dedicated shard of indexed Solana data.
+- **Optionally hosts agents on spare CPU** — one command lends your CPU to run other users' agents for the agent cloud (custody stays off-box), earning CIRC while your node is staked. See [Run a CPU node](#run-a-cpu-node-earn-circ).
 - **Optionally runs a GPU inference node** — one command turns a GPU box into a stage of the **decentralized Qwen2.5-72B**, serving real traffic and earning a proportional share of CIRC inference fees. See [Run a GPU node](#run-a-gpu-node-earn-circ).
 - **Free inference chat** — the dashboard's Inference tab gives you a streaming LLM chat interface, connected to the CIRCUIT decentralized network. Free for node operators running a co-located coordinator.
 - **Stays current automatically** — checks GitHub releases every hour, verifies checksum + ed25519 operator signature before applying, and keeps a rollback archive so you can revert to any previous version.
@@ -86,6 +87,20 @@ Open **`http://localhost:19000`** while the node is running for full visibility 
 | **Chat** | Conversation interface with a paired `circuit-agent` |
 
 The **Cloud** tab is read-only. If you've lent spare CPU to the agent cloud (`circuit agent host`), it shows the agents this node runs for other users. Custody is **off-box** — your machine runs the agents' compute but never holds their signing keys (those live in the [signer](https://github.com/Circuit-LLM/circuit-agent-cloud)). Not contributing yet? The tab tells you how to start.
+
+---
+
+## Run a CPU node (earn CIRC)
+
+Spare CPU can host **other users' agents** for the [agent cloud](https://github.com/Circuit-LLM/circuit-agent-cloud) — your machine runs their compute, and while your node is **staked** you earn CIRC for the capacity you lend, the same way a GPU node earns for inference.
+
+```bash
+node node-client.js host
+```
+
+This starts the node-host supervisor. It admits agent workloads under a resource **budget** — a cap on how many agents run and how much CPU and memory each may use — and keeps them alive, restarting on crash. **Custody is off-box:** your machine executes the agents' compute but never holds their signing keys (those live in the [signer](https://github.com/Circuit-LLM/circuit-agent-cloud)). The host registers ed25519-signed, and the dashboard's **Cloud** tab shows which agents it's currently running.
+
+Staking is what turns hosting into payout: connect your wallet in the dashboard to verify your on-chain CIRC stake (same as for a GPU node). A node that isn't staked can still host, but earns nothing.
 
 ---
 

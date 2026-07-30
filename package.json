@@ -1,6 +1,6 @@
 {
   "name": "circuit-node-client",
-  "version": "0.1.0",
+  "version": "0.1.10",
   "description": "CIRCUIT Network Node — run a node, earn free API access, power the mesh",
   "main": "node-client.js",
   "scripts": {
