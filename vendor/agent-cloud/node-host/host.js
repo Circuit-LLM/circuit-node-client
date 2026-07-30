@@ -15,7 +15,7 @@ import { pullBytes } from '../lib/bundle-store.js';
 import { resolveEgressHosts } from './egress-proxy.js';
 import { detectOciRuntime, detectMicroVm, buildContainerSpec, DEFAULT_OCI_IMAGE } from './oci.js';
 import { loadOrCreateNodeKey, signNodeHeaders } from '../lib/node-auth.js';
-import { isFirstPartyNodeRuntime } from '../lib/proto.js';
+import { allowsNodeRuntimeBundle } from '../lib/proto.js';
 import { workloadOf } from '../lib/agent-types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -68,6 +68,16 @@ const CFG = {
   // Publishers allowed to use the unsandboxed 'node' runtime. Empty = own-fleet (allow all); when set,
   // only these may run node-runtime bundles — every other publisher must ship 'oci'.
   firstPartyKeys: (process.env.CIRCUIT_FIRST_PARTY_KEYS || '').split(',').map((s) => s.trim()).filter(Boolean),
+  // Whether this host will run node-runtime bundles AT ALL. Set CIRCUIT_ALLOW_NODE_BUNDLES=0 on a host
+  // that lends capacity to OTHER owners' agents (the desktop node-client does this).
+  //
+  // Why a separate switch: a node-runtime bundle is an unsandboxed same-uid process, and the scheduler
+  // only gates bundles on SANDBOX RANK — a 'node' bundle needs rank 'node', which every host has. The
+  // workloads a node advertises do NOT gate bundles. So on a multi-tenant host the sandbox tier alone
+  // cannot keep third-party code out: the publisher picks `runtime` in their own manifest, and picking
+  // 'node' lands them same-uid next to the operator's node identity key. firstPartyKeys would stop it,
+  // but it defaults to allow-all when unset, so an unpinned host has no guard at all.
+  allowNodeBundles: process.env.CIRCUIT_ALLOW_NODE_BUNDLES !== '0',
 };
 let RESOLVED_SANDBOX = null; // computed once at register()
 
@@ -187,8 +197,18 @@ async function resolveBundle(a, dir) {
   // DEFENSE IN DEPTH: the 'node' runtime is an unsandboxed same-uid process — only safe for first-party
   // code. When the operator pins CIRCUIT_FIRST_PARTY_KEYS, refuse a node-runtime bundle from any other
   // publisher (they must use 'oci'). Don't rely solely on the scheduler having placed it correctly.
-  if (runtime === 'node' && !isFirstPartyNodeRuntime(b.manifest?.publisherPubkey, CFG.firstPartyKeys)) {
-    throw new Error('node-runtime bundle from a non-first-party publisher — untrusted publishers must use oci');
+  //
+  // Refusing here is safe: the scheduler records the start failure and re-places the agent elsewhere
+  // (see failedNodes/placeAttempts), so it stays honestly PENDING rather than running unsandboxed.
+  if (runtime === 'node') {
+    const verdict = allowsNodeRuntimeBundle({
+      allowNodeBundles: CFG.allowNodeBundles,
+      publisher: b.manifest?.publisherPubkey,
+      firstPartyKeys: CFG.firstPartyKeys,
+    });
+    if (!verdict.ok) {
+      throw new Error(`node-runtime bundle refused (${verdict.reason}) — untrusted publishers must ship an oci bundle`);
+    }
   }
   const cacheDir = path.join(CFG.bundleCacheDir, b.sha256);
   const okMarker = path.join(cacheDir, '.circuit-ok');

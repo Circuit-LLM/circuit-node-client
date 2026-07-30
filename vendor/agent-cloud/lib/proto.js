@@ -32,6 +32,30 @@ export function isFirstPartyNodeRuntime(publisher, firstPartyKeys) {
   return firstPartyKeys.includes(publisher);
 }
 
+/**
+ * May this host run a node-runtime ('node') bundle from `publisher`?
+ *
+ * The 'node' runtime is an unsandboxed same-uid process, and the SCHEDULER cannot keep third-party
+ * code off a host on its own: nodeSatisfies() gates a bundle on sandbox RANK only, a 'node' bundle
+ * needs rank 'node', and the publisher chooses `runtime` in their own manifest. The workload types a
+ * node advertises don't gate bundles at all. So admission has to be decided host-side, by two
+ * independent gates:
+ *
+ *   allowNodeBundles=false — a MULTI-TENANT host (one lending capacity to other owners' agents, e.g.
+ *     the desktop node-client) refuses every node-runtime bundle outright. Necessary because
+ *     firstPartyKeys is allow-all when unpinned, and such a host must not depend on the operator
+ *     having pinned it. Same-uid third-party code could read the node's identity key.
+ *   firstPartyKeys — an own-fleet host may allow node-runtime bundles, optionally narrowed to
+ *     specific publishers.
+ *
+ * @returns {{ok: boolean, reason?: string}}
+ */
+export function allowsNodeRuntimeBundle({ allowNodeBundles = true, publisher, firstPartyKeys } = {}) {
+  if (!allowNodeBundles) return { ok: false, reason: 'host-refuses-node-runtime-bundles' };
+  if (!isFirstPartyNodeRuntime(publisher, firstPartyKeys)) return { ok: false, reason: 'non-first-party-publisher' };
+  return { ok: true };
+}
+
 export function nodeSatisfies(node, agent) {
   const b = agent?.spec?.bundle;
   // Built-in (sealed, first-party) workload — no SANDBOX requirement, but the node must actually be

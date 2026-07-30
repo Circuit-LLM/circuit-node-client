@@ -1,8 +1,8 @@
 {
-  "syncedAt": "2026-07-29T08:18:23.730Z",
+  "syncedAt": "2026-07-30T03:20:09.657Z",
   "sources": {
     "circuit-agent-cloud": {
-      "commit": "043014444b884fca326adf162c4fe6c32fb44a23",
+      "commit": "ec13c7b6d5179946f65b4c118b1294fe36958861",
       "dirty": false
     },
     "circuit-signal-agent": {
@@ -25,8 +25,8 @@
     "agent-cloud/lib/ed25519.js": "e97c8c6bd242a5d84dd5b2dfc76827c92b8848374f62337407ff46791a715034",
     "agent-cloud/lib/netguard.js": "de37e4cf09ac16e5c85bddafc0a1907ae660e2fe0d5cd48528b61eaa581dce6a",
     "agent-cloud/lib/node-auth.js": "ba8f6c4323158b1275ee280e8e58cf14b6c1e8ef05441a19ded26ac79e2eb4e8",
-    "agent-cloud/lib/proto.js": "fccf8e3c397a5927cc3baf0fc238b73c9c8234c82cbbec7fec95a62c5a07df91",
-    "agent-cloud/node-host/host.js": "d9e0ba6cf2350e86892baa48d1ede59dafc564e659b010de74272b735fc93fea",
+    "agent-cloud/lib/proto.js": "edfeb8ddc8d5ed980d853759047bcdb42e00685756b178573e6a597944b92b48",
+    "agent-cloud/node-host/host.js": "53de84e39358f39653e348743c7751a354c057c7948ce197a4b70857bc26130c",
     "agent-cloud/node-host/env.js": "6fdfd4e2dbc7049acdd2891c869747eec24abd2448390b5b50c3e8ac255d0696",
     "agent-cloud/node-host/oci.js": "b4fd1eaca9f06166827b59bd5294651a604a62b82238f4d97c3240d883a43f1d",
     "agent-cloud/node-host/egress-proxy.js": "c29a39a30e70a24f98ebc8e9909e6e97d01e9529acad82fbb371da4c00b39c4d",
