@@ -1,20 +1,20 @@
 {
-  "syncedAt": "2026-07-30T03:20:09.657Z",
+  "syncedAt": "2026-08-02T07:29:06.379Z",
   "sources": {
     "circuit-agent-cloud": {
       "commit": "ec13c7b6d5179946f65b4c118b1294fe36958861",
       "dirty": false
     },
     "circuit-signal-agent": {
-      "commit": "152f5f5c0bb79bc244add8be8cd8b076f423fe7b",
+      "commit": "b595f9fc8da97671d1c986920c1ab76e4a201142",
       "dirty": false,
-      "sdk": "^0.2.8",
+      "sdk": "^0.2.10",
       "workload": "signal-scout"
     },
     "circuit-nft-agent": {
-      "commit": "09a0a73df1363838ad3c193128aa229a5fb25e82",
+      "commit": "7e21072280cfd01694cbb27f6dc39f3afa9ea93a",
       "dirty": false,
-      "sdk": "^0.2.8",
+      "sdk": "^0.2.10",
       "workload": "nft-scout"
     }
   },
@@ -32,7 +32,7 @@
     "agent-cloud/node-host/egress-proxy.js": "c29a39a30e70a24f98ebc8e9909e6e97d01e9529acad82fbb371da4c00b39c4d",
     "agent-cloud/node-host/egress-proxy-main.js": "b55b9f4a02779f849a5c02da1f3b4915ab793045847167048c13945f5943317e",
     "agent-cloud/agentd/agentd.js": "afe3e589dced94debdcc16476497f8f2bcf3f58e7e4037f65629f6a8f0897898",
-    "agent-cloud/signal-agent/agent.cjs": "ab3b519c5bcab465587a17c69265286c7995f18a90645ff378b8070f9e3989f5",
-    "agent-cloud/nft-agent/agent.cjs": "0c53dcb5dcb653d8ecd2d36764ee239827e32d1ef6bca29297f08fb594028ae0"
+    "agent-cloud/signal-agent/agent.cjs": "73cbe2b27c8de906e553b3a51f4395ade4bd8c4332f8fd1d10d09e8d2643a8a7",
+    "agent-cloud/nft-agent/agent.cjs": "f26df4a6de28859d9c9e600b64c06fb6398c086c3b27f4b2fb77df7fdaef2675"
   }
 }

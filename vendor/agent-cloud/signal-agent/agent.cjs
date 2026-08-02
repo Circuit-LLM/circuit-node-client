@@ -32391,6 +32391,42 @@ var Data = class {
   nftOverview() {
     return this.get("/api/nft-overview");
   }
+  /** All indexed Tensor collection floors (on-chain). sort: 'listed' | 'floor' | '-floor'. */
+  nftFloors(opts = {}) {
+    return this.get("/api/nft/floors", { limit: opts.limit, sort: opts.sort });
+  }
+  /** One Tensor collection's floor, listed count and cheapest open listings, by verified-collection address. */
+  nftCollection(collection, opts = {}) {
+    return this.get(`/api/nft/collection/${collection}`, { listings: opts.listings });
+  }
+  /** Global NFT market snapshot: indexed collections, total listings, bid coverage, live arb count, median floor. */
+  nftMarket() {
+    return this.get("/api/nft/market");
+  }
+  /** Mark-to-market NFT arbitrage — collections whose floor sits at/below the best standing collection bid, ranked by netSpreadSol (after royalty + fees on both legs). Bids can be stale/thin; verify before acting. */
+  nftArb(opts = {}) {
+    return this.get("/api/nft/arb", { minSpreadSol: opts.minSpreadSol, limit: opts.limit });
+  }
+  /** Inspect one NFT by mint: listed?, price, collection (+ name), floor, best standing bid, and sellableIntoBid. */
+  nftAsset(mint) {
+    return this.get(`/api/nft/asset/${mint}`);
+  }
+  /** Full standing collection-bid depth for a collection (highest first). `limit` ≤ 200, default 50. */
+  nftBids(collection, opts = {}) {
+    return this.get(`/api/nft/bids/${collection}`, { limit: opts.limit });
+  }
+  /** Resolve a collection by NAME to its on-chain address (+ floor, listing count). `q` min 2 chars. */
+  nftSearch(q, opts = {}) {
+    return this.get("/api/nft/search", { q, limit: opts.limit });
+  }
+  /** Recent listing ACTIVITY for a collection (fills/delists at last price, + avg/median) — a velocity read, not confirmed sales. `limit` ≤ 100, default 50. */
+  nftSales(collection, opts = {}) {
+    return this.get(`/api/nft/sales/${collection}`, { limit: opts.limit });
+  }
+  /** A wallet's NFTs with floor mark-to-market total (a lower bound). `limit` ≤ 500, default 200. */
+  walletNfts(owner, opts = {}) {
+    return this.get(`/api/nft/wallet/${owner}`, { limit: opts.limit });
+  }
   topPools() {
     return this.get("/api/top-pools");
   }
@@ -35185,6 +35221,29 @@ function makeWallet(opts = {}) {
 // agent.mjs
 var import_node_fs = require("node:fs");
 var import_node_path = require("node:path");
+
+// pay-policy.mjs
+var BACKOFF_BASE_MS = 6e4;
+var BACKOFF_MAX_MS = 18e5;
+function isPaymentError(e) {
+  const name = e?.name ?? "";
+  const msg = String(e?.message ?? "");
+  return name === "PaymentRequiredError" || /payment required|402/i.test(msg);
+}
+function shouldAttemptPaidInference({ paymentPath, backoffUntil = 0, now = Date.now() }) {
+  if (!paymentPath) return false;
+  return now >= backoffUntil;
+}
+function nextBackoffMs(failures) {
+  const n = Math.max(1, failures | 0);
+  return Math.min(BACKOFF_BASE_MS * 2 ** (n - 1), BACKOFF_MAX_MS);
+}
+function inferenceState({ useDllm, paymentPath }) {
+  if (!useDllm) return "off(config)";
+  return paymentPath ? "on" : "off(no-credential)";
+}
+
+// agent.mjs
 var WSOL = "So11111111111111111111111111111111111111112";
 var clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 var num = (v, d = 0) => Number.isFinite(Number(v)) ? Number(v) : d;
@@ -35255,8 +35314,16 @@ var SignalScout = class extends CircuitAgent {
     this.produced = 0;
     this.byStance = { bullish: 0, bearish: 0, neutral: 0 };
     this.last = null;
+    this.symbolCache = /* @__PURE__ */ new Map();
     const pay = this.internalKey ? "internal-key" : wallet ? "payment-wallet" : "free-only";
-    this.log(`signal-scout ready \u2014 topN=${this.topN} dllm=${this.useDllm} attest=${this.doAttest} pay=${pay} webhook=${this.webhookUrl ? "on" : "off"}`);
+    this.paymentPath = pay !== "free-only";
+    this.payFailures = 0;
+    this.payBackoffUntil = 0;
+    const dllmState = inferenceState({ useDllm: this.useDllm, paymentPath: this.paymentPath });
+    this.log(`signal-scout ready \u2014 topN=${this.topN} dllm=${dllmState} attest=${this.doAttest} pay=${pay} webhook=${this.webhookUrl ? "on" : "off"}`);
+    if (this.useDllm && !this.paymentPath) {
+      this.log("no payment credential \u2014 signals will be heuristic; not attempting paid inference (set CIRCUIT_WALLET/AGENT_KEYPAIR to enable)");
+    }
   }
   async tick() {
     this.applyKnobs();
@@ -35288,7 +35355,8 @@ var SignalScout = class extends CircuitAgent {
       }
       const change = (price - prev) / prev * 100;
       if (this.minChangePct && Math.abs(change) < this.minChangePct) continue;
-      const snap = { mint, sym: c.symbol || `${mint.slice(0, 4)}\u2026`, priceUsd: price, volumeSol: num(c.volumeSol), change };
+      const sym = c.symbol || await this.resolveSymbol(mint) || `${mint.slice(0, 4)}\u2026`;
+      const snap = { mint, sym, priceUsd: price, volumeSol: num(c.volumeSol), change };
       const signal = await this.analyze(snap);
       if (!signal) continue;
       await this.publish(signal);
@@ -35296,22 +35364,65 @@ var SignalScout = class extends CircuitAgent {
     }
     this.log(`tick \u2014 ${made} signal(s)${warming ? `, ${warming} warming` : ""} [total ${this.produced}]`);
   }
+  // Best-effort mint → symbol for published labels. Cached (never re-pays for the same mint), and gated on
+  // a payment path so SENSING stays free — in free-only mode this is a no-op and labels fall back to the mint.
+  async resolveSymbol(mint) {
+    if (this.symbolCache.has(mint)) return this.symbolCache.get(mint);
+    if (!this.paymentPath) {
+      this.symbolCache.set(mint, null);
+      return null;
+    }
+    let sym = null;
+    try {
+      const o = await this.dataClient.tokenOverview(mint);
+      if (o && typeof o.symbol === "string" && o.symbol.trim()) sym = o.symbol.trim();
+    } catch {
+    }
+    this.symbolCache.set(mint, sym);
+    return sym;
+  }
   async analyze(t) {
     const base2 = { mint: t.mint, symbol: t.sym, priceUsd: t.priceUsd, change: +num(t.change).toFixed(3), volumeSol: num(t.volumeSol), ts: Date.now() };
-    if (this.useDllm) {
+    if (this.useDllm && this.canInfer()) {
       try {
         const messages = this.prompt(t);
         if (this.doAttest && typeof this.ai.chatVerified === "function") {
           const r2 = await this.ai.chatVerified({ messages, maxTokens: 220 });
+          this.payFailures = 0;
           return { ...base2, ...parseVerdict(r2.content), source: "dllm", attested: !!r2.receipt, receipt: r2.receipt || null, paymentTx: r2.paymentTx || null };
         }
         const r = await this.ai.chat({ messages, maxTokens: 220 });
+        this.payFailures = 0;
         return { ...base2, ...parseVerdict(r.content), source: "dllm", attested: false, paymentTx: r.paymentTx || null };
       } catch (e) {
         this.log(`inference unavailable (${e.message}) \u2014 heuristic fallback`);
+        if (isPaymentError(e)) this.backOffPaidInference();
       }
     }
     return { ...base2, ...heuristic(t), source: "heuristic", attested: false };
+  }
+  // Whether to ATTEMPT paid inference this signal.
+  //
+  // Two independent reasons not to, both of which used to be discovered the expensive way — the SDK
+  // only raises PaymentRequiredError AFTER a 402 comes back, so an unfunded Scout issued one refused
+  // request per signal and fell back to the heuristic anyway. At topN=5 on a 60s tick that was ~300
+  // rejected requests an hour, indefinitely, for output identical to not asking.
+  //
+  //   1. no credential  — free-only mode can never pay, so never ask. This mirrors resolveSymbol(),
+  //      which already gates its paid lookup on this.paymentPath. Sensing stays free either way.
+  //   2. payments failing — a funded wallet that has run dry (or an endpoint refusing our payments)
+  //      would otherwise hammer just as hard. Back off instead, and recover on its own if it starts
+  //      working again.
+  canInfer() {
+    return shouldAttemptPaidInference({ paymentPath: this.paymentPath, backoffUntil: this.payBackoffUntil });
+  }
+  // Exponential backoff on repeated payment failures. Reset by the first success, so a refill resumes
+  // inference within one backoff window without a restart.
+  backOffPaidInference() {
+    this.payFailures = (this.payFailures ?? 0) + 1;
+    const waitMs = nextBackoffMs(this.payFailures);
+    this.payBackoffUntil = Date.now() + waitMs;
+    this.log(`paid inference backing off ${Math.round(waitMs / 6e4)}min after ${this.payFailures} payment failure(s)`);
   }
   prompt(t) {
     return [

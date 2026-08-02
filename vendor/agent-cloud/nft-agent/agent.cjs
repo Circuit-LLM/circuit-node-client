@@ -32391,6 +32391,42 @@ var Data = class {
   nftOverview() {
     return this.get("/api/nft-overview");
   }
+  /** All indexed Tensor collection floors (on-chain). sort: 'listed' | 'floor' | '-floor'. */
+  nftFloors(opts = {}) {
+    return this.get("/api/nft/floors", { limit: opts.limit, sort: opts.sort });
+  }
+  /** One Tensor collection's floor, listed count and cheapest open listings, by verified-collection address. */
+  nftCollection(collection, opts = {}) {
+    return this.get(`/api/nft/collection/${collection}`, { listings: opts.listings });
+  }
+  /** Global NFT market snapshot: indexed collections, total listings, bid coverage, live arb count, median floor. */
+  nftMarket() {
+    return this.get("/api/nft/market");
+  }
+  /** Mark-to-market NFT arbitrage — collections whose floor sits at/below the best standing collection bid, ranked by netSpreadSol (after royalty + fees on both legs). Bids can be stale/thin; verify before acting. */
+  nftArb(opts = {}) {
+    return this.get("/api/nft/arb", { minSpreadSol: opts.minSpreadSol, limit: opts.limit });
+  }
+  /** Inspect one NFT by mint: listed?, price, collection (+ name), floor, best standing bid, and sellableIntoBid. */
+  nftAsset(mint) {
+    return this.get(`/api/nft/asset/${mint}`);
+  }
+  /** Full standing collection-bid depth for a collection (highest first). `limit` ≤ 200, default 50. */
+  nftBids(collection, opts = {}) {
+    return this.get(`/api/nft/bids/${collection}`, { limit: opts.limit });
+  }
+  /** Resolve a collection by NAME to its on-chain address (+ floor, listing count). `q` min 2 chars. */
+  nftSearch(q, opts = {}) {
+    return this.get("/api/nft/search", { q, limit: opts.limit });
+  }
+  /** Recent listing ACTIVITY for a collection (fills/delists at last price, + avg/median) — a velocity read, not confirmed sales. `limit` ≤ 100, default 50. */
+  nftSales(collection, opts = {}) {
+    return this.get(`/api/nft/sales/${collection}`, { limit: opts.limit });
+  }
+  /** A wallet's NFTs with floor mark-to-market total (a lower bound). `limit` ≤ 500, default 200. */
+  walletNfts(owner, opts = {}) {
+    return this.get(`/api/nft/wallet/${owner}`, { limit: opts.limit });
+  }
   topPools() {
     return this.get("/api/top-pools");
   }
@@ -35257,46 +35293,70 @@ var NftScout = class extends CircuitAgent {
   }
   async tick() {
     this.applyKnobs();
-    let floors;
+    let floorsResp;
     try {
-      floors = await this.dataClient.get("/api/nft/floors", { limit: this.scanN, sort: this.sort });
+      floorsResp = await this.dataClient.nftFloors({ limit: this.scanN, sort: this.sort });
     } catch (e) {
       this.log(`floors error: ${e.message}`);
       return;
     }
-    const list = floors && floors.collections || [];
-    const cands = [.../* @__PURE__ */ new Set([...Object.keys(this.watchFloors), ...list.map((c) => c.collection)])].slice(0, this.scanN);
-    if (!cands.length) {
+    const floorMap = new Map((floorsResp && floorsResp.collections || []).map((c) => [c.collection, c]));
+    let arbResp;
+    try {
+      arbResp = await this.dataClient.nftArb({ minSpreadSol: this.minSpreadSol, limit: this.scanN });
+    } catch (e) {
+      this.log(`arb error: ${e.message}`);
+      arbResp = null;
+    }
+    const arbOpps = arbResp && arbResp.opportunities || [];
+    for (const c of Object.keys(this.watchFloors)) {
+      if (floorMap.has(c)) continue;
+      try {
+        const d = await this.dataClient.nftCollection(c, { listings: 0 });
+        if (d && d.floorSol != null) floorMap.set(c, { collection: c, floorSol: num(d.floorSol), listed: num(d.listed) });
+      } catch {
+      }
+    }
+    if (!floorMap.size && !arbOpps.length) {
       this.log("no candidates this tick");
       return;
     }
     const opps = [];
-    for (const collection of cands) {
-      let d;
-      try {
-        d = await this.dataClient.get(`/api/nft/collection/${collection}`, { listings: 1 });
-      } catch {
-        continue;
-      }
-      if (!d || d.floorSol == null) continue;
-      const floor = num(d.floorSol);
+    for (const a of arbOpps) {
+      const floor = num(a.floorSol);
+      if (floor <= 0) continue;
+      const netSpreadSol = a.netSpreadSol != null ? num(a.netSpreadSol) : num(a.spreadSol);
+      const netSpreadPct = netSpreadSol / floor * 100;
+      if (netSpreadSol < this.minSpreadSol || netSpreadPct < this.minSpreadPct) continue;
+      opps.push({
+        type: "arb",
+        collection: a.collection,
+        floorSol: floor,
+        topBidSol: num(a.topBidSol),
+        spreadSol: num(a.spreadSol),
+        spreadPct: num(a.spreadPct),
+        netSpreadSol,
+        netSpreadPct,
+        netInTheMoney: !!a.netInTheMoney,
+        royaltyBps: a.royaltyBps ?? null,
+        listed: num((floorMap.get(a.collection) || {}).listed),
+        rank: netSpreadSol
+      });
+    }
+    for (const [collection, c] of floorMap) {
+      const floor = num(c.floorSol);
+      if (floor <= 0) continue;
+      const listed = num(c.listed);
       const prev = this.prevFloor[collection];
       this.prevFloor[collection] = floor;
-      if (d.floorBelowBid && d.topBidSol != null && floor > 0) {
-        const spreadSol = num(d.spreadSol);
-        const spreadPct = spreadSol / floor * 100;
-        if (spreadSol >= this.minSpreadSol && spreadPct >= this.minSpreadPct) {
-          opps.push({ type: "arb", collection, floorSol: floor, topBidSol: num(d.topBidSol), spreadSol, spreadPct, listed: num(d.listed), rank: spreadSol });
-        }
-      }
       const target = num(this.watchFloors[collection], 0);
       if (target > 0 && floor <= target) {
-        opps.push({ type: "floor-hit", collection, floorSol: floor, targetSol: target, listed: num(d.listed), rank: target - floor + 1e6 });
+        opps.push({ type: "floor-hit", collection, floorSol: floor, targetSol: target, listed, rank: target - floor + 1e6 });
       }
       if (prev > 0) {
         const movePct = (floor - prev) / prev * 100;
         if (Math.abs(movePct) >= this.minMovePct) {
-          opps.push({ type: "floor-move", collection, floorSol: floor, prevFloorSol: prev, movePct, listed: num(d.listed), rank: Math.abs(movePct) });
+          opps.push({ type: "floor-move", collection, floorSol: floor, prevFloorSol: prev, movePct, listed, rank: Math.abs(movePct) });
         }
       }
     }
@@ -35317,7 +35377,7 @@ var NftScout = class extends CircuitAgent {
       this.lastEmitted[key] = sig;
       made++;
     }
-    this.log(`tick \u2014 inspected ${cands.length}, ${opps.length} opportunit${opps.length === 1 ? "y" : "ies"}, ${made} new signal(s)${dup ? `, ${dup} unchanged` : ""} [total ${this.produced}]`);
+    this.log(`tick \u2014 scanned ${floorMap.size} floors + ${arbOpps.length} arb, ${opps.length} opportunit${opps.length === 1 ? "y" : "ies"}, ${made} new signal(s)${dup ? `, ${dup} unchanged` : ""} [total ${this.produced}]`);
   }
   async analyze(opp) {
     const base2 = { ...opp, symbol: shortColl(opp.collection), ts: Date.now() };
@@ -35338,9 +35398,9 @@ var NftScout = class extends CircuitAgent {
     return { ...base2, ...heuristic(opp), source: "heuristic", attested: false };
   }
   prompt(o) {
-    const facts = o.type === "arb" ? `Collection ${o.collection}: floor ${o.floorSol} SOL, best standing collection bid ${o.topBidSol} SOL, gross spread ${o.spreadSol.toFixed(4)} SOL (${o.spreadPct.toFixed(1)}% of floor), ${o.listed} listed. This looks like a buy-floor/sell-into-bid arb.` : o.type === "floor-hit" ? `Collection ${o.collection}: floor ${o.floorSol} SOL reached the accumulation target ${o.targetSol} SOL, ${o.listed} listed.` : `Collection ${o.collection}: floor moved to ${o.floorSol} SOL from ${o.prevFloorSol} SOL (${o.movePct.toFixed(1)}%), ${o.listed} listed.`;
+    const facts = o.type === "arb" ? `Collection ${o.collection}: floor ${o.floorSol} SOL, best standing collection bid ${o.topBidSol} SOL, NET spread ${o.netSpreadSol.toFixed(4)} SOL (${o.netSpreadPct.toFixed(1)}% of floor, after royalties + fees; gross ${o.spreadSol.toFixed(4)} SOL), ${o.listed} listed. This looks like a buy-floor/sell-into-bid arb.` : o.type === "floor-hit" ? `Collection ${o.collection}: floor ${o.floorSol} SOL reached the accumulation target ${o.targetSol} SOL, ${o.listed} listed.` : `Collection ${o.collection}: floor moved to ${o.floorSol} SOL from ${o.prevFloorSol} SOL (${o.movePct.toFixed(1)}%), ${o.listed} listed.`;
     return [
-      { role: "system", content: 'You are a disciplined Solana NFT analyst. The spread is GROSS \u2014 creator royalties and marketplace fees (often 5-10% combined) and stale/spoofed bids can erase it. Respond with ONLY a JSON object: {"stance":"act|watch|avoid","confidence":0-100,"thesis":"one sentence","risks":"one sentence"}. No text outside the JSON.' },
+      { role: "system", content: 'You are a disciplined Solana NFT analyst. The arb spread is NET of creator royalties + Tensor fees (both legs), but a stale or spoofed standing bid can still erase it. Respond with ONLY a JSON object: {"stance":"act|watch|avoid","confidence":0-100,"thesis":"one sentence","risks":"one sentence"}. No text outside the JSON.' },
       { role: "user", content: `${facts} Give your verdict.` }
     ];
   }
@@ -35364,7 +35424,7 @@ var NftScout = class extends CircuitAgent {
     this.produced++;
     this.byType[sig.type] = (this.byType[sig.type] || 0) + 1;
     this.last = sig;
-    const detail = sig.type === "arb" ? `spread ${sig.spreadSol.toFixed(4)} SOL (${sig.spreadPct.toFixed(1)}%)` : sig.type === "floor-hit" ? `floor ${sig.floorSol}\u2264${sig.targetSol} SOL` : `${sig.movePct >= 0 ? "+" : ""}${sig.movePct.toFixed(1)}% \u2192 ${sig.floorSol} SOL`;
+    const detail = sig.type === "arb" ? `net ${sig.netSpreadSol.toFixed(4)} SOL (${sig.netSpreadPct.toFixed(1)}%)` : sig.type === "floor-hit" ? `floor ${sig.floorSol}\u2264${sig.targetSol} SOL` : `${sig.movePct >= 0 ? "+" : ""}${sig.movePct.toFixed(1)}% \u2192 ${sig.floorSol} SOL`;
     this.log(`SIGNAL ${sig.type.toUpperCase()} ${sig.symbol} ${detail} \u2192 ${String(sig.stance).toUpperCase()} ${sig.confidence}%${sig.source === "heuristic" ? " (heuristic)" : ""}${sig.attested ? " \u2713attested" : ""} \u2014 ${sig.thesis}`);
   }
   heartbeatExtra() {
@@ -35399,12 +35459,12 @@ function parseVerdict(content) {
 }
 function heuristic(o) {
   if (o.type === "arb") {
-    const netPct = o.spreadPct - 8;
+    const netPct = o.netSpreadPct;
     return {
       stance: netPct > 5 ? "act" : netPct > 0 ? "watch" : "avoid",
       confidence: Math.round(clamp(40 + netPct, 0, 90)),
-      thesis: `Floor ${o.floorSol} SOL sits under a ${o.topBidSol} SOL standing bid \u2014 gross edge ${o.spreadPct.toFixed(1)}%.`,
-      risks: "Gross of royalties + fees (~5-10%); the bid may be stale or thin. Verify before acting."
+      thesis: `Floor ${o.floorSol} SOL sits under a ${o.topBidSol} SOL standing bid \u2014 net edge ${o.netSpreadPct.toFixed(1)}% after royalties + fees.`,
+      risks: "Net of royalties + fees, but the standing bid may be stale or thin (royalty ~6% assumed if unindexed). Verify before acting."
     };
   }
   if (o.type === "floor-hit") {
